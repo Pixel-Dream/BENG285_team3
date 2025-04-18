@@ -113,13 +113,13 @@ def plot_pie_chart(df, column_name, title=None, figsize=(10, 8),
         if style == 'publication':
             plt.rcParams.update({
                 'font.family': font_family,
-                'font.size': 11,
-                'axes.labelsize': 12,
-                'axes.titlesize': 14,
-                'xtick.labelsize': 10,
-                'ytick.labelsize': 10,
-                'legend.fontsize': 10,
-                'figure.titlesize': 16
+                'font.size': 20,
+                'axes.labelsize': 20,
+                'axes.titlesize': 20,
+                'xtick.labelsize': 20,
+                'ytick.labelsize': 20,
+                'legend.fontsize': 20,
+                'figure.titlesize': 20
             })
         elif style == 'modern':
             plt.rcParams.update({
