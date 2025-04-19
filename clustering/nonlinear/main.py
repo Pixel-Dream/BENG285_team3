@@ -138,8 +138,8 @@ def parameter_exploration(adata_path, group_mapping_path, method_name='tsne', co
 # Execute examples if run as script
 if __name__ == "__main__":
     # Path to your data files
-    ADATA_PATH = "lung_cancer_data.h5ad"  # Update with your file path
-    GROUP_MAPPING_PATH = "meta_group.json"  # Update with your file path
+    ADATA_PATH = "../../data/z-scaled_w_normalized_merged.h5ad"  # Update with your file path
+    GROUP_MAPPING_PATH = "../../data/meta_group.json"  # Update with your file path
     
     # Check if data files exist
     if not os.path.exists(ADATA_PATH):

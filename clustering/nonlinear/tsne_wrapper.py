@@ -97,24 +97,5 @@ class TSNEReduction(DimensionalReduction):
             'n_iter': [500, 1000, 2000],
             'early_exaggeration': [8, 12, 16],
             'init': ['pca', 'random'],
-            'metric': ['euclidean', 'cosine', 'correlation'],
-            'random_state': [123]
+            'metric': ['euclidean', 'cosine', 'correlation']
         }
-    
-    # def get_param_grid(self):
-    #     """Return a comprehensive parameter grid for t-SNE exploration."""
-    #     return {
-    #         # Your existing parameters (all good choices)
-    #         'perplexity': [30],
-    #         'learning_rate': [200],
-    #         'n_iter': [1000],
-    #         'early_exaggeration': [12],
-    #         'init': ['pca'],
-    #         'metric': ['euclidean'],
-            
-    #         # Additional parameters worth considering
-    #         'method': ['barnes_hut', 'exact'],  # Important for larger datasets
-    #         'initial_momentum': [0.5],     # Default is 0.5
-    #         'final_momentum': [0.8],       # Default is 0.8
-    #         'random_state': [123]                # For reproducibility
-    #     }

@@ -108,5 +108,4 @@ class UMAPReduction(DimensionalReduction):
             'init': ['spectral', 'random', 'pca'],  # Added random initialization
             'n_epochs': [200, 500],  # Added epoch options
             'learning_rate': [0.5, 1.0],  # Added learning rate options
-            'random_state': [123]  # Added for reproducibility
         }

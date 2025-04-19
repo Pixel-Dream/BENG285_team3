@@ -334,28 +334,22 @@ def main():
     """
     Main entry point for the script
     """
-    parser = argparse.ArgumentParser(description='Evaluate embeddings for clustering')
-    parser.add_argument('--base_dir', type=str, required=True,
-                        help='Base directory containing embedding subdirectories')
-    parser.add_argument('--anndata', type=str, required=True,
-                        help='Path to AnnData object (.h5ad file)')
-    parser.add_argument('--output_dir', type=str, default='results',
-                        help='Directory to save results (default: results)')
-    parser.add_argument('--label_columns', type=str, nargs='+',
-                        help='Columns to use as true labels (optional, defaults to gender, smoker_status_grouped, tumor_status)')
-    
-    args = parser.parse_args()
+    base_dir = "../clustering/nonlinear/tsne_parameter_exploration"
+    # base_dir = "../clustering/nonlinear/umap_parameter_exploration"
+    anndata = "../data/z-scaled_w_normalized_merged.h5ad"
+    output_dir = "tsne_scoring_results"
+    # output_dir = "umap_scoring_results"
     
     # Run the evaluation
     results = evaluate_embeddings(
-        args.base_dir,
-        args.anndata,
-        args.label_columns,
-        args.output_dir
+        base_dir=base_dir,
+        anndata_path=anndata,
+        label_columns=None,
+        output_dir=output_dir
     )
     
     if results is not None:
-        print(f"\nEvaluation complete! Results saved to {args.output_dir}")
+        print(f"\nEvaluation complete! Results saved to {output_dir}")
 
 
 if __name__ == "__main__":
