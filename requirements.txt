@@ -1,0 +1,11 @@
+gdown
+numpy
+scanpy
+pandas
+matplotlib
+seaborn
+scikit-learn
+hdbscan
+anndata
+umap-learn
+Pillow
