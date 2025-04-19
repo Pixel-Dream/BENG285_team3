@@ -51,9 +51,9 @@ cd scoring_stats
 python scoring.py
 ```
 
-For UMAP and t-SNE with best parameters, you can run the Jupyter Notebooks under `scoring_stats/best_score_results/`.
+For UMAP and t-SNE with best parameters, you can run the Jupyter Notebooks `scoring_stats/best_score_results.ipynb`.
 
 6. Get UMAP and t-SNE results with the re-downloaded TCGA data
-You can run the Jupyter Notebooks under `re_downloaded_data_viz.ipynb` to get the results.
+You can run the Jupyter Notebooks `re_downloaded_data_viz.ipynb` to get the results.
 
 
