@@ -1,15 +1,13 @@
-# mutation.py - With Debugging
-import pandas as pd
 import numpy as np
 import os
+import pandas as pd
 from typing import List, Dict, Optional, Union, Any
 import sys
 from collections import defaultdict
 
 # Define how many debug messages to print per category
 DEBUG_LIMIT = 5
-debug_counters = defaultdict(int) # Use defaultdict from collections if needed elsewhere
-                                 # otherwise just use a regular dict
+debug_counters = defaultdict(int)
 
 class Mutation:
     """Represents a single somatic mutation event"""
@@ -19,7 +17,6 @@ class Mutation:
                  variant_classification: str, **kwargs):
         self.patient_id = patient_id
         self.gene = gene
-        # Store chromosome name as provided, handle 'chr' prefix later if needed
         self.chromosome = str(chromosome)
         self.position = position
         self.ref_allele = ref_allele
@@ -27,7 +24,6 @@ class Mutation:
         self.variant_type = variant_type
         self.variant_classification = variant_classification
 
-        # Store any additional attributes
         for key, value in kwargs.items():
             setattr(self, key, value)
 

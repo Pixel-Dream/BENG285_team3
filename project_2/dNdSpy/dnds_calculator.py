@@ -4,7 +4,7 @@ from typing import Dict, List, Tuple, Optional, Union, Any
 from collections import defaultdict
 import pandas as pd
 import sys
-from mutation import Mutation
+from data_classes import Mutation
 
 # Define how many debug messages to print per category
 DEBUG_LIMIT = 5
@@ -94,11 +94,12 @@ class DnDsCalculator:
         return impacts
 
 
-    def calculate_expected_ns_ratio(self, sequence: str) -> Dict[str, Dict[str, float]]:
+    def calculate_expected_ns_ratio(self, sequence: str) -> Dict[str, Dict[str, Dict[str, float]]]:
         """
-        Calculate the expected numbers of synonymous and non-synonymous mutations
-        based on sequence context and the trinucleotide model (with debugging).
-        Returns: {'synonymous': {mut_type: rate_sum}, 'missense': {...}, ...}
+        Calculate the expected numbers (counts) and summed rates of synonymous and non-synonymous
+        mutations based on sequence context and the trinucleotide model.
+        Returns: {'rates': {'synonymous': {mut_type: rate_sum}, ...},
+                  'counts': {'synonymous': {mut_type: count_sum}, ...}}
         """
         # Reset debug counters for this calculation
         global debug_counters
@@ -106,7 +107,7 @@ class DnDsCalculator:
         # debug_counters = defaultdict(int)
 
         if debug_counters['exp_calc_calls'] < DEBUG_LIMIT:
-             print(f"Debug (Calculator.ExpRatio): Calculating expected ratios for sequence len={len(sequence)}...")
+             print(f"Debug (Calculator.ExpRatio): Calculating expected rates and counts for sequence len={len(sequence)}...")
              debug_counters['exp_calc_calls'] += 1
         sys.stdout.flush()
 
@@ -114,7 +115,8 @@ class DnDsCalculator:
         # --- Input Validation and Cleaning ---
         if not isinstance(sequence, str) or len(sequence) == 0:
              print("Debug (Calculator.ExpRatio): ERROR - Input sequence is empty or not a string.")
-             return {'synonymous': {}, 'missense': {}, 'nonsense': {}}
+             return {'rates': {'synonymous': {}, 'missense': {}, 'nonsense': {}},
+                     'counts': {'synonymous': {}, 'missense': {}, 'nonsense': {}}} # Return empty structure
 
         # Ensure uppercase and replace non-ACGT with N
         clean_seq = ''.join(n if n in "ACGT" else "N" for n in sequence.upper())
@@ -136,11 +138,12 @@ class DnDsCalculator:
             clean_len = len(clean_seq) # Update length
 
         if clean_len < 3:
-            print(f"Debug (Calculator.ExpRatio): Sequence too short (len={clean_len}) after cleaning/trimming. Cannot calculate ratios.")
-            return {'synonymous': {}, 'missense': {}, 'nonsense': {}}
+            print(f"Debug (Calculator.ExpRatio): Sequence too short (len={clean_len}) after cleaning/trimming. Cannot calculate.")
+            return {'rates': {'synonymous': {}, 'missense': {}, 'nonsense': {}},
+                     'counts': {'synonymous': {}, 'missense': {}, 'nonsense': {}}} # Return empty structure
 
 
-        # --- Initialize Expected Counts ---
+        # --- Initialize Expected Rates and Counts ---
         # Store sums of rates per mutation type (e.g., C>T) within each impact class
         expected_rates = {
             'synonymous': defaultdict(float),
@@ -148,6 +151,14 @@ class DnDsCalculator:
             'nonsense': defaultdict(float),
             'stop_loss': defaultdict(float), # Track stop loss separately
             'other': defaultdict(float)      # Track other impacts
+        }
+        # Store counts of potential mutations per mutation type within each impact class
+        expected_counts = {
+            'synonymous': defaultdict(float), # Use float for consistency, though counts are integers
+            'missense': defaultdict(float),
+            'nonsense': defaultdict(float),
+            'stop_loss': defaultdict(float),
+            'other': defaultdict(float)
         }
         codons_processed = 0
         sites_processed = 0
@@ -207,7 +218,14 @@ class DnDsCalculator:
                         impact_type = site_impacts.get((pos_in_codon, alt_base))
 
                         if impact_type: # Should always be found if codon was valid
-                            # Get the mutation rate from the trinucleotide model
+                            # --- Count the potential mutation ---
+                            if impact_type in expected_counts:
+                                expected_counts[impact_type][mutation_key] += 1.0
+                            else:
+                                expected_counts['other'][mutation_key] += 1.0
+                                # Log if needed, but impact_type should be known
+
+                            # --- Get the mutation rate and add to expected rates ---
                             # The get_rate method now includes internal debugging
                             rate = self.trinuc_model.get_rate(ref_base, alt_base, context)
 
@@ -219,7 +237,7 @@ class DnDsCalculator:
                                      # This case should ideally not happen with current impacts
                                      expected_rates['other'][mutation_key] += rate
                                      if debug_counters['exp_unknown_impact'] < DEBUG_LIMIT:
-                                          print(f"  Debug (Calculator.ExpRatio): Unknown impact type '{impact_type}' encountered for {mutation_key} in {codon} ({context}). Added to 'other'.")
+                                          print(f"  Debug (Calculator.ExpRatio): Unknown impact type '{impact_type}' encountered for {mutation_key} in {codon} ({context}). Added to 'other' rates.")
                                           debug_counters['exp_unknown_impact'] += 1
 
                             else: # Rate is zero or negative (error?)
@@ -236,7 +254,8 @@ class DnDsCalculator:
 
 
         # --- Summary and Fallback ---
-        total_expected_sum = sum(sum(rates.values()) for rates in expected_rates.values())
+        total_expected_rate_sum = sum(sum(rates.values()) for rates in expected_rates.values())
+        total_expected_count_sum = sum(sum(counts.values()) for counts in expected_counts.values())
 
         if debug_counters['exp_calc_summary'] < DEBUG_LIMIT:
              print(f"Debug (Calculator.ExpRatio): --- Calculation Summary ---")
@@ -246,67 +265,61 @@ class DnDsCalculator:
              print(f"  Sites skipped (N in context): {sites_skipped_n_in_context}")
              print(f"  Mutations considered: {mutations_considered}")
              print(f"  Mutations with zero rate: {mutations_with_zero_rate}")
-             print(f"  Total expected rate sum: {total_expected_sum:.4f}")
+             print(f"  Total expected rate sum: {total_expected_rate_sum:.4f}")
+             print(f"  Total expected count sum: {total_expected_count_sum:.1f}")
+             print("  Rates Sums per impact:")
              for impact, rates_dict in expected_rates.items():
                   print(f"    - {impact}: {sum(rates_dict.values()):.4f}")
+             print("  Counts per impact:")
+             for impact, counts_dict in expected_counts.items():
+                  print(f"    - {impact}: {sum(counts_dict.values()):.1f}")
              print(f"Debug (Calculator.ExpRatio): --------------------------")
              debug_counters['exp_calc_summary'] += 1
              sys.stdout.flush()
 
 
-        # Check for the "all zeros" case from the trinucleotide model
-        if total_expected_sum == 0 and mutations_considered > 0:
+        # Check for the "all zeros" case from the trinucleotide model for rates
+        if total_expected_rate_sum == 0 and mutations_considered > 0:
             # This suggests the trinuc model itself is returning zeros, despite valid sites/mutations
             print("Warning (Calculator.ExpRatio): Trinucleotide model returned all zeros. Expected rates sum is 0.")
-            print("                             Attempting fallback to uniform rates (counts based)...")
+            print("                             Rates will be zero. Counts are based on potential mutations.")
+            # No fallback calculation needed here anymore, as counts are already calculated.
+            # The expected_rates dictionary correctly reflects the zero rates.
             sys.stdout.flush()
 
-            # Fallback: Count potential mutations of each type, assuming uniform rate = 1
-            expected_rates = { # Reset dictionary
-                'synonymous': defaultdict(float), 'missense': defaultdict(float),
-                'nonsense': defaultdict(float), 'stop_loss': defaultdict(float),
-                'other': defaultdict(float)
-            }
-            fallback_mut_count = 0
-            for i in range(0, clean_len - 2, 3):
-                codon = clean_seq[i : i+3]
-                if 'N' in codon: continue # Skip codons with N
-
-                site_impacts = self._calculate_site_impacts(codon)
-                for (pos_in_codon, alt_base), impact_type in site_impacts.items():
-                     ref_base = codon[pos_in_codon]
-                     mutation_key = f"{ref_base}>{alt_base}"
-                     if impact_type in expected_rates:
-                          expected_rates[impact_type][mutation_key] += 1.0 # Add count
-                          fallback_mut_count += 1
-                     else:
-                          expected_rates['other'][mutation_key] += 1.0
-                          fallback_mut_count += 1
-
-            total_fallback_sum = sum(sum(rates.values()) for rates in expected_rates.values())
-            print(f"Debug (Calculator.ExpRatio): Fallback - Counted {fallback_mut_count} possible mutations.")
-            print(f"Debug (Calculator.ExpRatio): Fallback - Total count sum: {total_fallback_sum:.1f}")
-            # NOTE: These are now counts, not rates. Downstream might need adjustment
-            # or normalization if this fallback is used. The current structure returns
-            # the counts directly in the 'expected_rates' dict.
-
-        # Return the dictionary containing sums of rates (or counts in fallback) per impact type
+        # Return the dictionaries containing sums of rates and counts per impact type
         # Convert defaultdicts back to regular dicts for safety
-        final_expected = {k: dict(v) for k, v in expected_rates.items()}
-        return final_expected
+        final_expected_rates = {k: dict(v) for k, v in expected_rates.items()}
+        final_expected_counts = {k: dict(v) for k, v in expected_counts.items()}
+
+        return {'rates': final_expected_rates, 'counts': final_expected_counts}
 
 
     def calculate_dnds(self, observed_mutations: List[Mutation],
-                      expected_counts: Dict[str, Dict[str, float]]) -> Dict[str, float]:
+                      expected_output: Dict[str, Dict[str, Dict[str, float]]]) -> Dict[str, float]:
         """
-        Calculate dN/dS ratios for a gene based on observed and expected counts.
-        Expected counts should be the output of calculate_expected_ns_ratio.
+        Calculate dN/dS ratios for a gene based on observed and expected rates/counts.
+        Expected output should be the dictionary returned by calculate_expected_ns_ratio.
         (Debugging added)
         """
         if debug_counters['dnds_calc_calls'] < DEBUG_LIMIT:
              print(f"Debug (Calculator.dNdS): Calculating dN/dS for gene...")
              debug_counters['dnds_calc_calls'] += 1
         sys.stdout.flush()
+
+        # --- Extract Expected Rates ---
+        # Check if the input dictionary has the expected structure
+        if not isinstance(expected_output, dict) or 'rates' not in expected_output:
+             print("Error (Calculator.dNdS): Invalid format for expected_output. Expected {'rates': {...}, 'counts': {...}}.")
+             # Return NaN for all results or raise an error
+             results_nan = {f'dnds_{imp}': np.nan for imp in ['missense', 'nonsense', 'splice_site', 'global']}
+             results_nan.update({'n_syn': 0, 'n_mis': 0, 'n_non': 0, 'n_spl': 0,
+                                 'exp_syn': np.nan, 'exp_mis': np.nan, 'exp_non': np.nan, 'exp_spl': np.nan,
+                                 'exp_cts_syn': np.nan, 'exp_cts_mis': np.nan, 'exp_cts_non': np.nan, 'exp_cts_spl': np.nan}) # Add counts
+             return results_nan
+
+        expected_rates = expected_output.get('rates', {}) # Default to empty dict if key missing
+        expected_counts_data = expected_output.get('counts', {}) # Get counts too
 
         # --- Count Observed Mutations by Impact ---
         observed_counts = defaultdict(int)
@@ -318,48 +331,56 @@ class DnDsCalculator:
             # Add other categories if needed
 
         # --- Sum Expected Rates by Impact ---
-        # The input 'expected_counts' already contains the summed rates per mutation type
+        # The input 'expected_rates' already contains the summed rates per mutation type
         # We need to sum these rates across mutation types for each impact class
-        expected_sums = defaultdict(float)
-        if expected_counts: # Check if dict is not empty
-             for impact_type, rates_dict in expected_counts.items():
-                  expected_sums[impact_type] = sum(rates_dict.values())
+        expected_rate_sums = defaultdict(float)
+        if expected_rates: # Check if dict is not empty
+             for impact_type, rates_dict in expected_rates.items():
+                  expected_rate_sums[impact_type] = sum(rates_dict.values())
         else:
-             print("Debug (Calculator.dNdS): WARNING - Expected counts dictionary is empty.")
+             print("Debug (Calculator.dNdS): WARNING - Expected rates dictionary is empty or missing.")
+
+        # --- Sum Expected Counts by Impact --- (Optional: For reporting/debugging)
+        expected_count_sums = defaultdict(float)
+        if expected_counts_data:
+            for impact_type, counts_dict in expected_counts_data.items():
+                expected_count_sums[impact_type] = sum(counts_dict.values())
 
 
         print(f"Debug (Calculator.dNdS): --- dN/dS Calculation Inputs ---")
         print(f"  Observed: Syn={observed_counts['synonymous']}, Mis={observed_counts['missense']}, Non={observed_counts['nonsense']}, Spl={observed_counts['splice_site']}")
-        print(f"  Expected Sums: Syn={expected_sums['synonymous']:.4f}, Mis={expected_sums['missense']:.4f}, Non={expected_sums['nonsense']:.4f}, Spl={expected_sums['splice_site']:.4f}")
+        print(f"  Expected Rate Sums: Syn={expected_rate_sums['synonymous']:.4f}, Mis={expected_rate_sums['missense']:.4f}, Non={expected_rate_sums['nonsense']:.4f}, Spl={expected_rate_sums['splice_site']:.4f}")
+        print(f"  Expected Count Sums: Syn={expected_count_sums['synonymous']:.1f}, Mis={expected_count_sums['missense']:.1f}, Non={expected_count_sums['nonsense']:.1f}, Spl={expected_count_sums['splice_site']:.1f}") # Print counts
 
 
         # --- Calculate dN/dS Ratios ---
+        # dN/dS fundamentally relies on RATES (observed count / expected rate)
         dnds_results = {}
         n_syn_obs = observed_counts['synonymous']
-        e_syn_exp = expected_sums['synonymous']
+        e_syn_exp = expected_rate_sums['synonymous'] # Use EXPECTED RATE sum
 
         # Check if synonymous baseline can be calculated
         if n_syn_obs > 0 and e_syn_exp > 0:
             syn_rate = n_syn_obs / e_syn_exp # Observed synonymous rate
-            print(f"Debug (Calculator.dNdS): Synonymous Rate (Obs/Exp) = {syn_rate:.4f}")
+            print(f"Debug (Calculator.dNdS): Synonymous Rate (Obs/ExpRate) = {syn_rate:.4f}")
 
             # Calculate dN/dS for different non-synonymous types
             for impact_type in ['missense', 'nonsense', 'splice_site']: # Add others if needed
                  n_obs = observed_counts[impact_type]
-                 e_exp = expected_sums[impact_type]
+                 e_exp = expected_rate_sums[impact_type] # Use EXPECTED RATE sum
 
                  if e_exp > 0:
                       non_syn_rate = n_obs / e_exp
                       dnds_results[f'dnds_{impact_type}'] = non_syn_rate / syn_rate
                       print(f"  Debug (Calculator.dNdS): {impact_type.capitalize()} Rate={non_syn_rate:.4f}, dN/dS={dnds_results[f'dnds_{impact_type}']:.4f}")
                  else:
-                      dnds_results[f'dnds_{impact_type}'] = np.nan # Assign NaN if expected is zero
-                      print(f"  Debug (Calculator.dNdS): {impact_type.capitalize()} Rate=N/A (Exp=0), dN/dS=NaN")
+                      dnds_results[f'dnds_{impact_type}'] = np.nan # Assign NaN if expected rate is zero
+                      print(f"  Debug (Calculator.dNdS): {impact_type.capitalize()} Rate=N/A (ExpRate=0), dN/dS=NaN")
 
 
             # Calculate Global dN/dS (all non-synonymous combined)
             n_nonsyn_obs = observed_counts['missense'] + observed_counts['nonsense'] + observed_counts['splice_site']
-            e_nonsyn_exp = expected_sums['missense'] + expected_sums['nonsense'] + expected_sums['splice_site']
+            e_nonsyn_exp = expected_rate_sums['missense'] + expected_rate_sums['nonsense'] + expected_rate_sums['splice_site'] # Use EXPECTED RATE sums
 
             if e_nonsyn_exp > 0:
                  global_nonsyn_rate = n_nonsyn_obs / e_nonsyn_exp
@@ -367,25 +388,29 @@ class DnDsCalculator:
                  print(f"  Debug (Calculator.dNdS): Global NonSyn Rate={global_nonsyn_rate:.4f}, dN/dS={dnds_results['dnds_global']:.4f}")
             else:
                  dnds_results['dnds_global'] = np.nan
-                 print(f"  Debug (Calculator.dNdS): Global NonSyn Rate=N/A (Exp=0), dN/dS=NaN")
+                 print(f"  Debug (Calculator.dNdS): Global NonSyn Rate=N/A (ExpRate=0), dN/dS=NaN")
 
         else:
             # Cannot calculate any dN/dS if baseline is zero
-            print("Debug (Calculator.dNdS): WARNING - Cannot calculate dN/dS (ObsSyn=0 or ExpSyn=0). Setting all to NaN.")
+            print("Debug (Calculator.dNdS): WARNING - Cannot calculate dN/dS (ObsSyn=0 or ExpRateSyn=0). Setting all to NaN.")
             for impact_type in ['missense', 'nonsense', 'splice_site', 'global']:
                  dnds_results[f'dnds_{impact_type}'] = np.nan
 
 
-        # Add raw counts and expected sums to the results dictionary for reference
+        # Add raw counts, expected rate sums, AND expected count sums to the results
         dnds_results.update({
             'n_syn': observed_counts['synonymous'],
             'n_mis': observed_counts['missense'],
             'n_non': observed_counts['nonsense'],
             'n_spl': observed_counts['splice_site'],
-            'exp_syn': expected_sums['synonymous'],
-            'exp_mis': expected_sums['missense'],
-            'exp_non': expected_sums['nonsense'],
-            'exp_spl': expected_sums['splice_site']
+            'exp_rate_syn': expected_rate_sums['synonymous'],
+            'exp_rate_mis': expected_rate_sums['missense'],
+            'exp_rate_non': expected_rate_sums['nonsense'],
+            'exp_rate_spl': expected_rate_sums['splice_site'],
+            'exp_cts_syn': expected_count_sums['synonymous'], # Add expected counts
+            'exp_cts_mis': expected_count_sums['missense'],
+            'exp_cts_non': expected_count_sums['nonsense'],
+            'exp_cts_spl': expected_count_sums['splice_site']
         })
 
         print("Debug (Calculator.dNdS): Finished dN/dS calculation for gene.")

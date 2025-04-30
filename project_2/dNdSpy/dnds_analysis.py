@@ -12,7 +12,7 @@ from trinucleotide_model import TrinucleotideModel
 from negative_binomial_model import NegativeBinomialModel
 from dnds_calculator import DnDsCalculator
 from selection_tester import SelectionTester
-from mutation import Mutation, Gene, Sample, MutationDataset, ReferenceGenome, GeneAnnotation # Import necessary classes
+from data_classes import Mutation, Gene, Sample, MutationDataset, ReferenceGenome, GeneAnnotation # Import necessary classes
 
 # Define how many debug messages to print per category
 DEBUG_LIMIT = 5
@@ -102,7 +102,8 @@ class DnDsAnalysis:
         print("\nDebug (Analysis.run): Step 3 - Processing genes (sequences and expected counts)...")
         sys.stdout.flush()
         gene_sequences = {}
-        expected_counts = {} # Stores dict: {gene_name: {'synonymous': {mut:rate,...}, 'missense': ...}}
+        expected_counts_rates = {} # Stores dict: {gene_name: {'synonymous': {mut:rate,...}, 'missense': ...}}
+        expected_counts_counts = {} # Stores dict: {gene_name: {'synonymous': {mut:count,...}, 'missense': ...}}
         observed_mutations_by_gene = defaultdict(list) # Store observed mutations grouped by gene
         genes_processed = 0
         genes_skipped_no_info = 0
@@ -121,16 +122,17 @@ class DnDsAnalysis:
         # Process each gene present in the mutation data's gene list
         # Use the genes dictionary from the MutationDataset as the primary loop source
         print(f"Debug (Analysis.run): Iterating through {len(self.dataset.genes)} genes found in the mutation data...")
-        gene_iterator = tqdm(self.dataset.genes.items(), desc="Processing genes", total=len(self.dataset.genes), file=sys.stdout)
+        print(f"Debug (Analysis.run): Processing {len(self.dataset.genes)} genes...")
+        sys.stdout.flush()
 
-        for gene_name, gene_obj in gene_iterator:
+        for gene_name, gene_obj in self.dataset.genes.items():
             # A) Get gene annotation info
             gene_info = self.gene_annotation.get_gene_info(gene_name)
             if not gene_info:
                 genes_skipped_no_info += 1
                 if debug_counters['proc_gene_no_info'] < DEBUG_LIMIT:
                     # Use gene_iterator.write for tqdm compatibility
-                    gene_iterator.write(f"  Debug (Proc.Gene): Skipping '{gene_name}' - No annotation info found.")
+                    # gene_iterator.write(f"  Debug (Proc.Gene): Skipping '{gene_name}' - No annotation info found.")
                     debug_counters['proc_gene_no_info'] += 1
                 continue # Skip gene if no annotation
 
@@ -151,30 +153,34 @@ class DnDsAnalysis:
             # C) Calculate expected mutation counts using the calculator
             try:
                  # This method now has debug prints
-                 gene_expected = self.dnds_calculator.calculate_expected_ns_ratio(coding_sequence)
+                 expected_dict = self.dnds_calculator.calculate_expected_ns_ratio(coding_sequence)
+                 gene_expected_rates = expected_dict['rates']
+                 gene_expected_counts = expected_dict['counts']
 
                  # Check if expected counts are all zero for this gene
-                 total_exp_gene = sum(sum(counts.values()) for counts in gene_expected.values())
+                 total_exp_gene = sum(sum(counts.values()) for counts in gene_expected_rates.values())
                  if total_exp_gene == 0:
                       genes_with_zero_expected += 1
                       if debug_counters['proc_gene_zero_exp'] < DEBUG_LIMIT:
-                           gene_iterator.write(f"  Debug (Proc.Gene): WARNING - Gene '{gene_name}' resulted in zero expected mutations. Check trinuc rates and CDS.")
+                        #    gene_iterator.write(f"  Debug (Proc.Gene): WARNING - Gene '{gene_name}' resulted in zero expected mutations. Check trinuc rates and CDS.")
                            debug_counters['proc_gene_zero_exp'] += 1
                       # Store the zero counts anyway, might be needed later
-                      expected_counts[gene_name] = gene_expected
+                      expected_counts_rates[gene_name] = gene_expected_rates
+                      expected_counts_counts[gene_name] = gene_expected_counts
                  else:
-                      expected_counts[gene_name] = gene_expected
+                      expected_counts_rates[gene_name] = gene_expected_rates
+                      expected_counts_counts[gene_name] = gene_expected_counts
                       # Optional: Print details for the first few successful genes
                       if debug_counters['proc_gene_success'] < DEBUG_LIMIT:
-                           exp_syn = sum(gene_expected.get('synonymous', {}).values())
-                           exp_mis = sum(gene_expected.get('missense', {}).values())
-                           exp_non = sum(gene_expected.get('nonsense', {}).values())
-                           gene_iterator.write(f"  Debug (Proc.Gene): Processed '{gene_name}'. Len={len(coding_sequence)}. ExpSyn={exp_syn:.3f}, ExpMis={exp_mis:.3f}, ExpNon={exp_non:.3f}")
+                           exp_syn = sum(gene_expected_rates.get('synonymous', {}).values())
+                           exp_mis = sum(gene_expected_rates.get('missense', {}).values())
+                           exp_non = sum(gene_expected_rates.get('nonsense', {}).values())
+                        #    gene_iterator.write(f"  Debug (Proc.Gene): Processed '{gene_name}'. Len={len(coding_sequence)}. ExpSyn={exp_syn:.3f}, ExpMis={exp_mis:.3f}, ExpNon={exp_non:.3f}")
                            debug_counters['proc_gene_success'] += 1
 
             except Exception as e:
                  if debug_counters['proc_gene_calc_error'] < DEBUG_LIMIT:
-                      gene_iterator.write(f"  Debug (Proc.Gene): ERROR calculating expected counts for '{gene_name}': {e}")
+                    #   gene_iterator.write(f"  Debug (Proc.Gene): ERROR calculating expected counts for '{gene_name}': {e}")
                       debug_counters['proc_gene_calc_error'] += 1
                  continue # Skip gene if calculation fails
 
@@ -185,16 +191,16 @@ class DnDsAnalysis:
         print(f"Debug (Analysis.run): Genes skipped (no annotation info): {genes_skipped_no_info}")
         print(f"Debug (Analysis.run): Genes skipped (CDS extraction failed): {genes_skipped_no_cds}")
         print(f"Debug (Analysis.run): Genes with zero expected mutations: {genes_with_zero_expected}")
-        print(f"Debug (Analysis.run): Total expected counts stored for {len(expected_counts)} genes.")
+        print(f"Debug (Analysis.run): Total expected counts stored for {len(expected_counts_rates)} genes.")
         sys.stdout.flush()
 
         # Check if any expected counts were calculated
-        if not expected_counts:
+        if not expected_counts_rates:
              print("Debug (Analysis.run): ERROR - No expected mutation counts could be calculated for any gene. Cannot proceed.")
              return None
 
         # Sanity check: Total expected synonymous mutations across all processed genes
-        total_expected_syn_all = sum(sum(gene_expected.get('synonymous', {}).values()) for gene_expected in expected_counts.values())
+        total_expected_syn_all = sum(sum(gene_expected.get('synonymous', {}).values()) for gene_expected in expected_counts_rates.values())
         print(f"Debug (Analysis.run): Sanity Check - Total expected synonymous mutations across all genes: {total_expected_syn_all:.4f}")
         if total_expected_syn_all == 0:
             print("Debug (Analysis.run): CRITICAL WARNING - Total expected synonymous count is zero! Check trinucleotide model rates and sequence processing.")
@@ -221,7 +227,8 @@ class DnDsAnalysis:
              gene_results_df = self.selection_tester.test_selection(
                  genes=self.dataset.genes, # Pass the Gene objects
                  observed_mutations=observed_mutations_by_gene, # Pass the grouped dict
-                 expected_counts=expected_counts, # Pass the calculated expected counts
+                 expected_counts_rates=expected_counts_rates, # Pass the calculated expected counts
+                 expected_counts_counts=expected_counts_counts, # Pass the calculated expected counts
                  null_model='neutral', # Or other model
                  fdr_threshold=fdr_threshold
              )
@@ -248,7 +255,7 @@ class DnDsAnalysis:
         sys.stdout.flush()
         try:
             # Use the same grouped observed mutations and calculated expected counts
-            self.global_dnds = self._calculate_global_dnds(observed_mutations_by_gene, expected_counts)
+            self.global_dnds = self._calculate_global_dnds(observed_mutations_by_gene, expected_counts_rates)
             print(f"Debug (Analysis.run): Global dN/dS calculated:")
             for key, val in self.global_dnds.items():
                  print(f"  - {key}: {val:.4f}" if isinstance(val, float) else f"  - {key}: {val}")

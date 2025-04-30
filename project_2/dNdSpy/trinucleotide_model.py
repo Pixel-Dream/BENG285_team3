@@ -4,6 +4,8 @@ import numpy as np
 from typing import Dict, List, Tuple, Optional, Union
 from collections import defaultdict
 import sys # For flushing output
+from statsmodels.genmod.generalized_linear_model import GLMResults
+
 
 # Define how many debug messages to print per category
 DEBUG_LIMIT = 10 # Keep debug prints for now
@@ -26,10 +28,7 @@ class TrinucleotideModel:
 
         # Mapping from nucleotide to complementary nucleotide
         self.complement = {
-            'A': 'T', 'C': 'G', 'G': 'C', 'T': 'A',
-            'N': 'N', 'R': 'Y', 'Y': 'R', 'S': 'S',
-            'W': 'W', 'K': 'M', 'M': 'K', 'B': 'V',
-            'D': 'H', 'H': 'D', 'V': 'B', '.': '.'
+            'A': 'T', 'C': 'G', 'G': 'C', 'T': 'A', 'N': 'N'
         }
 
         # Create conversion dictionaries
