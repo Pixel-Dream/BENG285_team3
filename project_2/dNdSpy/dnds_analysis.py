@@ -79,18 +79,18 @@ class DnDsAnalysis:
             if np.all(self.trinuc_model.rates == 1.0):
                 print("Debug (Analysis.run): WARNING - Trinucleotide model rates are all 1.0 (uniform). This might indicate fitting issues or fallback.")
             elif np.all(self.trinuc_model.rates == 0.0):
-                 print("Debug (Analysis.run): ERROR - Trinucleotide model rates are all 0.0! This will cause issues.")
-                 # Decide how to handle this - maybe force uniform?
-                 # self.trinuc_model.rates = np.ones_like(self.trinuc_model.rates)
-                 # print("Debug (Analysis.run): Forcing uniform rates due to all zeros.")
+                print("Debug (Analysis.run): ERROR - Trinucleotide model rates are all 0.0! This will cause issues.")
+                # Decide how to handle this - maybe force uniform?
+                # self.trinuc_model.rates = np.ones_like(self.trinuc_model.rates)
+                # print("Debug (Analysis.run): Forcing uniform rates due to all zeros.")
             else:
-                 print(f"Debug (Analysis.run): Trinuc rates seem fitted (Min={np.min(self.trinuc_model.rates):.3f}, Max={np.max(self.trinuc_model.rates):.3f}, Mean={np.mean(self.trinuc_model.rates):.3f}).")
+                print(f"Debug (Analysis.run): Trinuc rates seem fitted (Min={np.min(self.trinuc_model.rates):.3f}, Max={np.max(self.trinuc_model.rates):.3f}, Mean={np.mean(self.trinuc_model.rates):.3f}).")
 
         except Exception as e:
-             print(f"Debug (Analysis.run): ERROR during trinucleotide model fitting: {e}")
-             import traceback
-             traceback.print_exc()
-             return None # Cannot proceed without a model
+            print(f"Debug (Analysis.run): ERROR during trinucleotide model fitting: {e}")
+            import traceback
+            traceback.print_exc()
+            return None # Cannot proceed without a model
         sys.stdout.flush()
 
 
@@ -143,42 +143,42 @@ class DnDsAnalysis:
             gene_sequences[gene_name] = coding_sequence
             # Update coding length in the Gene object if not already set
             if gene_obj.coding_length is None:
-                 gene_obj.coding_length = len(coding_sequence)
+                gene_obj.coding_length = len(coding_sequence)
 
 
             # C) Calculate expected mutation counts using the calculator
             try:
-                 # This method now has debug prints
-                 expected_dict = self.dnds_calculator.calculate_expected_ns_ratio(coding_sequence)
-                 gene_expected_rates = expected_dict['rates']
-                 gene_expected_counts = expected_dict['counts']
+                # This method now has debug prints
+                expected_dict = self.dnds_calculator.calculate_expected_ns_ratio(coding_sequence)
+                gene_expected_rates = expected_dict['rates']
+                gene_expected_counts = expected_dict['counts']
 
-                 # Check if expected counts are all zero for this gene
-                 total_exp_gene = sum(sum(counts.values()) for counts in gene_expected_rates.values())
-                 if total_exp_gene == 0:
-                      genes_with_zero_expected += 1
-                      if debug_counters['proc_gene_zero_exp'] < DEBUG_LIMIT:
+                # Check if expected counts are all zero for this gene
+                total_exp_gene = sum(sum(counts.values()) for counts in gene_expected_rates.values())
+                if total_exp_gene == 0:
+                    genes_with_zero_expected += 1
+                    if debug_counters['proc_gene_zero_exp'] < DEBUG_LIMIT:
                         #    gene_iterator.write(f"  Debug (Proc.Gene): WARNING - Gene '{gene_name}' resulted in zero expected mutations. Check trinuc rates and CDS.")
-                           debug_counters['proc_gene_zero_exp'] += 1
+                        debug_counters['proc_gene_zero_exp'] += 1
                       # Store the zero counts anyway, might be needed later
-                      expected_counts_rates[gene_name] = gene_expected_rates
-                      expected_counts_counts[gene_name] = gene_expected_counts
-                 else:
-                      expected_counts_rates[gene_name] = gene_expected_rates
-                      expected_counts_counts[gene_name] = gene_expected_counts
-                      # Optional: Print details for the first few successful genes
-                      if debug_counters['proc_gene_success'] < DEBUG_LIMIT:
-                           exp_syn = sum(gene_expected_rates.get('synonymous', {}).values())
-                           exp_mis = sum(gene_expected_rates.get('missense', {}).values())
-                           exp_non = sum(gene_expected_rates.get('nonsense', {}).values())
-                        #    gene_iterator.write(f"  Debug (Proc.Gene): Processed '{gene_name}'. Len={len(coding_sequence)}. ExpSyn={exp_syn:.3f}, ExpMis={exp_mis:.3f}, ExpNon={exp_non:.3f}")
-                           debug_counters['proc_gene_success'] += 1
+                    expected_counts_rates[gene_name] = gene_expected_rates
+                    expected_counts_counts[gene_name] = gene_expected_counts
+                else:
+                    expected_counts_rates[gene_name] = gene_expected_rates
+                    expected_counts_counts[gene_name] = gene_expected_counts
+                    # Optional: Print details for the first few successful genes
+                    if debug_counters['proc_gene_success'] < DEBUG_LIMIT:
+                        exp_syn = sum(gene_expected_rates.get('synonymous', {}).values())
+                        exp_mis = sum(gene_expected_rates.get('missense', {}).values())
+                        exp_non = sum(gene_expected_rates.get('nonsense', {}).values())
+                    #    gene_iterator.write(f"  Debug (Proc.Gene): Processed '{gene_name}'. Len={len(coding_sequence)}. ExpSyn={exp_syn:.3f}, ExpMis={exp_mis:.3f}, ExpNon={exp_non:.3f}")
+                        debug_counters['proc_gene_success'] += 1
 
             except Exception as e:
-                 if debug_counters['proc_gene_calc_error'] < DEBUG_LIMIT:
-                    #   gene_iterator.write(f"  Debug (Proc.Gene): ERROR calculating expected counts for '{gene_name}': {e}")
-                      debug_counters['proc_gene_calc_error'] += 1
-                 continue # Skip gene if calculation fails
+                if debug_counters['proc_gene_calc_error'] < DEBUG_LIMIT:
+                #   gene_iterator.write(f"  Debug (Proc.Gene): ERROR calculating expected counts for '{gene_name}': {e}")
+                    debug_counters['proc_gene_calc_error'] += 1
+                continue # Skip gene if calculation fails
 
             genes_processed += 1
 
@@ -192,8 +192,8 @@ class DnDsAnalysis:
 
         # Check if any expected counts were calculated
         if not expected_counts_rates:
-             print("Debug (Analysis.run): ERROR - No expected mutation counts could be calculated for any gene. Cannot proceed.")
-             return None
+            print("Debug (Analysis.run): ERROR - No expected mutation counts could be calculated for any gene. Cannot proceed.")
+            return None
 
         # Sanity check: Total expected synonymous mutations across all processed genes
         total_expected_syn_all = sum(sum(gene_expected.get('synonymous', {}).values()) for gene_expected in expected_counts_rates.values())
@@ -207,30 +207,30 @@ class DnDsAnalysis:
         print("\nDebug (Analysis.run): Step 5 - Testing for selection...")
         sys.stdout.flush()
         try:
-             # Pass the pre-grouped observed mutations and the calculated expected counts
-             gene_results_df = self.selection_tester.test_selection(
-                 genes=self.dataset.genes, # Pass the Gene objects
-                 observed_mutations=observed_mutations_by_gene, # Pass the grouped dict
-                 expected_counts_rates=expected_counts_rates, # Pass the calculated expected counts
-                 expected_counts_counts=expected_counts_counts, # Pass the calculated expected counts
-                 null_model='neutral', # Or other model
-                 fdr_threshold=fdr_threshold
-             )
-             self.gene_results = gene_results_df # Store the DataFrame
-             print(f"Debug (Analysis.run): Selection testing completed. Results shape: {self.gene_results.shape if self.gene_results is not None else 'None'}")
-             if self.gene_results is not None and not self.gene_results.empty:
-                  print(f"Debug (Analysis.run): Selection results head:\n{self.gene_results.head(DEBUG_LIMIT)}")
-             elif self.gene_results is not None and self.gene_results.empty:
-                  print("Debug (Analysis.run): WARNING - Selection testing returned an empty DataFrame.")
-             else:
-                  print("Debug (Analysis.run): WARNING - Selection testing returned None.")
+            # Pass the pre-grouped observed mutations and the calculated expected counts
+            gene_results_df = self.selection_tester.test_selection(
+                genes=self.dataset.genes, # Pass the Gene objects
+                observed_mutations=observed_mutations_by_gene, # Pass the grouped dict
+                expected_counts_rates=expected_counts_rates, # Pass the calculated expected counts
+                expected_counts_counts=expected_counts_counts, # Pass the calculated expected counts
+                null_model='negative', # Or other model
+                fdr_threshold=fdr_threshold
+            )
+            self.gene_results = gene_results_df # Store the DataFrame
+            print(f"Debug (Analysis.run): Selection testing completed. Results shape: {self.gene_results.shape if self.gene_results is not None else 'None'}")
+            if self.gene_results is not None and not self.gene_results.empty:
+                print(f"Debug (Analysis.run): Selection results head:\n{self.gene_results.head(DEBUG_LIMIT)}")
+            elif self.gene_results is not None and self.gene_results.empty:
+                print("Debug (Analysis.run): WARNING - Selection testing returned an empty DataFrame.")
+            else:
+                print("Debug (Analysis.run): WARNING - Selection testing returned None.")
 
         except Exception as e:
-             print(f"Debug (Analysis.run): ERROR during selection testing: {e}")
-             import traceback
-             traceback.print_exc()
-             # Decide whether to continue or stop
-             self.gene_results = pd.DataFrame() # Create empty df to avoid downstream errors
+            print(f"Debug (Analysis.run): ERROR during selection testing: {e}")
+            import traceback
+            traceback.print_exc()
+            # Decide whether to continue or stop
+            self.gene_results = pd.DataFrame() # Create empty df to avoid downstream errors
         sys.stdout.flush()
 
 
@@ -242,11 +242,11 @@ class DnDsAnalysis:
             self.global_dnds = self._calculate_global_dnds(observed_mutations_by_gene, expected_counts_rates)
             print(f"Debug (Analysis.run): Global dN/dS calculated:")
             for key, val in self.global_dnds.items():
-                 print(f"  - {key}: {val:.4f}" if isinstance(val, float) else f"  - {key}: {val}")
+                print(f"  - {key}: {val:.4f}" if isinstance(val, float) else f"  - {key}: {val}")
 
         except Exception as e:
-             print(f"Debug (Analysis.run): ERROR calculating global dN/dS: {e}")
-             self.global_dnds = {} # Set empty dict
+            print(f"Debug (Analysis.run): ERROR calculating global dN/dS: {e}")
+            self.global_dnds = {} # Set empty dict
         sys.stdout.flush()
 
 
@@ -275,7 +275,7 @@ class DnDsAnalysis:
                     print("Debug (Analysis.run): Skipping saving global dN/dS (empty).")
 
             except Exception as e:
-                 print(f"Debug (Analysis.run): ERROR saving results to {output_dir}: {e}")
+                print(f"Debug (Analysis.run): ERROR saving results to {output_dir}: {e}")
         else:
             print("Debug (Analysis.run): No output directory specified, skipping saving results.")
         sys.stdout.flush()
@@ -289,8 +289,8 @@ class DnDsAnalysis:
         # Check if gene info exists and contains exons
         if not gene_info or 'exons' not in gene_info or not gene_info['exons']:
             if debug_counters['cds_no_exons'] < DEBUG_LIMIT:
-                 print(f"  Debug (GetCDS): Gene '{gene_name}' - No exon data found in annotation.")
-                 debug_counters['cds_no_exons'] += 1
+                print(f"  Debug (GetCDS): Gene '{gene_name}' - No exon data found in annotation.")
+                debug_counters['cds_no_exons'] += 1
             return None
 
         chromosome = gene_info.get('chromosome')
@@ -299,8 +299,8 @@ class DnDsAnalysis:
 
         if not chromosome or not strand:
             if debug_counters['cds_no_chr_strand'] < DEBUG_LIMIT:
-                 print(f"  Debug (GetCDS): Gene '{gene_name}' - Missing chromosome or strand in annotation.")
-                 debug_counters['cds_no_chr_strand'] += 1
+                print(f"  Debug (GetCDS): Gene '{gene_name}' - Missing chromosome or strand in annotation.")
+                debug_counters['cds_no_chr_strand'] += 1
             return None
 
         # Sort exons by start position (important for correct assembly)
@@ -317,16 +317,16 @@ class DnDsAnalysis:
             else:
                 # If any exon fetch fails, the CDS is incomplete/unreliable
                 if debug_counters['cds_exon_fetch_fail'] < DEBUG_LIMIT:
-                     print(f"  Debug (GetCDS): Gene '{gene_name}' - Failed to fetch exon sequence at {chromosome}:{start-1}-{end}.")
-                     debug_counters['cds_exon_fetch_fail'] += 1
+                    print(f"  Debug (GetCDS): Gene '{gene_name}' - Failed to fetch exon sequence at {chromosome}:{start-1}-{end}.")
+                    debug_counters['cds_exon_fetch_fail'] += 1
                 fetch_failed = True
                 break # Stop trying to fetch exons for this gene
 
         if fetch_failed or not exon_seqs:
-             if not fetch_failed and debug_counters['cds_no_seqs_fetched'] < DEBUG_LIMIT:
-                  print(f"  Debug (GetCDS): Gene '{gene_name}' - No exon sequences could be fetched.")
-                  debug_counters['cds_no_seqs_fetched'] += 1
-             return None # Return None if fetch failed or no sequences obtained
+            if not fetch_failed and debug_counters['cds_no_seqs_fetched'] < DEBUG_LIMIT:
+                print(f"  Debug (GetCDS): Gene '{gene_name}' - No exon sequences could be fetched.")
+                debug_counters['cds_no_seqs_fetched'] += 1
+            return None # Return None if fetch failed or no sequences obtained
 
         # Combine exons into preliminary coding sequence
         coding_seq = ''.join(exon_seqs).upper() # Ensure uppercase
@@ -339,23 +339,23 @@ class DnDsAnalysis:
         # 1. Check length requirement (at least one codon)
         if len(coding_seq) < 3:
             if debug_counters['cds_too_short'] < DEBUG_LIMIT:
-                 print(f"  Debug (GetCDS): Gene '{gene_name}' - Assembled CDS too short (len={len(coding_seq)}). Sequence: '{coding_seq[:20]}...'")
-                 debug_counters['cds_too_short'] += 1
+                print(f"  Debug (GetCDS): Gene '{gene_name}' - Assembled CDS too short (len={len(coding_seq)}). Sequence: '{coding_seq[:20]}...'")
+                debug_counters['cds_too_short'] += 1
             return None
 
         # 2. Ensure sequence length is a multiple of 3 (trim end if necessary)
         remainder = len(coding_seq) % 3
         if remainder > 0:
             if debug_counters['cds_trimmed'] < DEBUG_LIMIT:
-                 print(f"  Debug (GetCDS): Gene '{gene_name}' - CDS length {len(coding_seq)} not multiple of 3. Trimming last {remainder} bases.")
-                 debug_counters['cds_trimmed'] += 1
+                print(f"  Debug (GetCDS): Gene '{gene_name}' - CDS length {len(coding_seq)} not multiple of 3. Trimming last {remainder} bases.")
+                debug_counters['cds_trimmed'] += 1
             coding_seq = coding_seq[:-remainder]
             # Re-check length after trimming
             if len(coding_seq) < 3:
-                 if debug_counters['cds_too_short_after_trim'] < DEBUG_LIMIT:
-                      print(f"  Debug (GetCDS): Gene '{gene_name}' - CDS too short after trimming (len={len(coding_seq)}).")
-                      debug_counters['cds_too_short_after_trim'] += 1
-                 return None
+                if debug_counters['cds_too_short_after_trim'] < DEBUG_LIMIT:
+                    print(f"  Debug (GetCDS): Gene '{gene_name}' - CDS too short after trimming (len={len(coding_seq)}).")
+                    debug_counters['cds_too_short_after_trim'] += 1
+                return None
 
 
         # 3. Check for excessive ambiguous bases ('N')
@@ -363,8 +363,8 @@ class DnDsAnalysis:
         n_ratio = n_count / len(coding_seq)
         if n_ratio > 0.1: # Allow up to 10% N's
             if debug_counters['cds_too_many_n'] < DEBUG_LIMIT:
-                 print(f"  Debug (GetCDS): Gene '{gene_name}' - CDS has too many 'N' bases ({n_count}/{len(coding_seq)} = {n_ratio:.2f} > 0.1).")
-                 debug_counters['cds_too_many_n'] += 1
+                print(f"  Debug (GetCDS): Gene '{gene_name}' - CDS has too many 'N' bases ({n_count}/{len(coding_seq)} = {n_ratio:.2f} > 0.1).")
+                debug_counters['cds_too_many_n'] += 1
             return None
 
         # If all checks pass, return the validated coding sequence
@@ -389,15 +389,15 @@ class DnDsAnalysis:
         print(f"Debug (Global dN/dS): Summing observed counts from {len(observed_mutations_by_gene)} genes...")
         genes_with_obs = 0
         for gene_name, mutations in observed_mutations_by_gene.items():
-             # Only include genes for which we calculated expected counts
-             if gene_name in expected_counts_by_gene:
-                 genes_with_obs += 1
-                 for mutation in mutations:
-                     if mutation.is_synonymous(): total_observed['synonymous'] += 1
-                     elif mutation.is_missense(): total_observed['missense'] += 1
-                     elif mutation.is_nonsense(): total_observed['nonsense'] += 1
-                     elif mutation.is_splice_site(): total_observed['splice_site'] += 1
-                     # Add other categories if needed
+            # Only include genes for which we calculated expected counts
+            if gene_name in expected_counts_by_gene:
+                genes_with_obs += 1
+                for mutation in mutations:
+                    if mutation.is_synonymous(): total_observed['synonymous'] += 1
+                    elif mutation.is_missense(): total_observed['missense'] += 1
+                    elif mutation.is_nonsense(): total_observed['nonsense'] += 1
+                    elif mutation.is_splice_site(): total_observed['splice_site'] += 1
+                    # Add other categories if needed
         print(f"Debug (Global dN/dS): Summed observed counts from {genes_with_obs} relevant genes.")
 
         # Sum expected counts from the calculated dictionary
@@ -425,15 +425,15 @@ class DnDsAnalysis:
 
             # Calculate non-synonymous rates and dN/dS ratios
             for mut_type in ['missense', 'nonsense', 'splice_site']:
-                 n_obs = total_observed[mut_type]
-                 e_exp = total_expected[mut_type]
-                 if e_exp > 0:
-                      non_syn_rate = n_obs / e_exp
-                      dnds[mut_type] = non_syn_rate / syn_rate
-                      print(f"Debug (Global dN/dS): {mut_type.capitalize()} rate: {non_syn_rate:.4f}, dN/dS_{mut_type}: {dnds[mut_type]:.4f}")
-                 else:
-                      dnds[mut_type] = np.nan # Assign NaN if expected is zero
-                      print(f"Debug (Global dN/dS): {mut_type.capitalize()} rate: N/A (Exp=0), dN/dS_{mut_type}: NaN")
+                n_obs = total_observed[mut_type]
+                e_exp = total_expected[mut_type]
+                if e_exp > 0:
+                    non_syn_rate = n_obs / e_exp
+                    dnds[mut_type] = non_syn_rate / syn_rate
+                    print(f"Debug (Global dN/dS): {mut_type.capitalize()} rate: {non_syn_rate:.4f}, dN/dS_{mut_type}: {dnds[mut_type]:.4f}")
+                else:
+                    dnds[mut_type] = np.nan # Assign NaN if expected is zero
+                    print(f"Debug (Global dN/dS): {mut_type.capitalize()} rate: N/A (Exp=0), dN/dS_{mut_type}: NaN")
 
 
             # Calculate global non-synonymous dN/dS
@@ -479,8 +479,8 @@ class DnDsAnalysis:
             print("Debug (GetSignificant): ERROR - Analysis results not available.")
             return None
         if 'q_value' not in self.gene_results.columns:
-             print("Debug (GetSignificant): ERROR - 'q_value' column missing in results.")
-             return None
+            print("Debug (GetSignificant): ERROR - 'q_value' column missing in results.")
+            return None
 
         significant_df = self.gene_results[self.gene_results['q_value'] < fdr_threshold].copy()
         print(f"Debug (GetSignificant): Found {len(significant_df)} significant genes.")
@@ -502,8 +502,8 @@ class DnDsAnalysis:
             print(f"Debug (EstimateDrivers): Filtering results to provided list of {len(gene_list)} genes.")
             genes_df = genes_df[genes_df['gene_name'].isin(gene_list)]
             if genes_df.empty:
-                 print("Debug (EstimateDrivers): WARNING - No genes from the provided list found in results.")
-                 return drivers
+                print("Debug (EstimateDrivers): WARNING - No genes from the provided list found in results.")
+                return drivers
 
         print(f"Debug (EstimateDrivers): Calculating excess mutations based on {len(genes_df)} genes...")
 
@@ -546,7 +546,7 @@ class DnDsAnalysis:
             print(f"Debug (EstimateDrivers): Estimated excess - Missense={excess_mis:.2f}, Nonsense={excess_non:.2f}, Total={drivers['total']:.2f}")
 
         else:
-             print("Debug (EstimateDrivers): WARNING - Cannot estimate background rate (Total ObsSyn or ExpSyn is zero). Driver estimate will be 0.")
+            print("Debug (EstimateDrivers): WARNING - Cannot estimate background rate (Total ObsSyn or ExpSyn is zero). Driver estimate will be 0.")
 
 
         # Drivers per sample
@@ -555,8 +555,8 @@ class DnDsAnalysis:
             drivers['drivers_per_sample'] = drivers['total'] / n_samples
             print(f"Debug (EstimateDrivers): Estimated drivers per sample = {drivers['drivers_per_sample']:.3f} ({drivers['total']:.2f} / {n_samples} samples)")
         else:
-             print("Debug (EstimateDrivers): WARNING - No samples in dataset, cannot calculate drivers per sample.")
-             drivers['drivers_per_sample'] = 0.0
+            print("Debug (EstimateDrivers): WARNING - No samples in dataset, cannot calculate drivers per sample.")
+            drivers['drivers_per_sample'] = 0.0
 
         print("Debug (EstimateDrivers): Finished estimating drivers.")
         return drivers
