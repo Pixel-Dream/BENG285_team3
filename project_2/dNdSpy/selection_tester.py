@@ -62,8 +62,8 @@ class SelectionTester:
             # Alternative: dN/dS != 1 (selection)
             
             # Null model (dN/dS = 1)
-            mu_null = (n_syn + n_nonsyn) / (e_syn + e_nonsyn)
-            ll_null = stats.poisson.logpmf(n_syn, mu_null * e_syn) + stats.poisson.logpmf(n_nonsyn, mu_null * e_nonsyn)
+            mu_null = (n_syn + n_nonsyn) / (e_syn + e_nonsyn) # observed/expected
+            ll_null = stats.poisson.logpmf(n_syn, mu_null * e_syn) + stats.poisson.logpmf(n_nonsyn, mu_null * e_nonsyn) # 
             
             # Alternative model (separate rates)
             mu_syn = n_syn / e_syn if e_syn > 0 else 0

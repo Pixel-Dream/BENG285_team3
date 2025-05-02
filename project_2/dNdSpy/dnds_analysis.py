@@ -9,7 +9,7 @@ import sys
 
 # Import our modules (ensure these point to the debug versions)
 from trinucleotide_model import TrinucleotideModel
-from negative_binomial_model import NegativeBinomialModel
+# from negative_binomial_model import NegativeBinomialModel
 from dnds_calculator import DnDsCalculator
 from selection_tester import SelectionTester
 from data_classes import Mutation, Gene, Sample, MutationDataset, ReferenceGenome, GeneAnnotation # Import necessary classes
@@ -40,7 +40,6 @@ class DnDsAnalysis:
         print("Debug (Analysis.__init__): Initializing component models...")
         # Initialize statistical models
         self.trinuc_model = TrinucleotideModel() # Will print its own debug info
-        self.nb_model = NegativeBinomialModel() # Assumes this class exists
         self.dnds_calculator = DnDsCalculator(self.trinuc_model) # Will print its own debug info
         self.selection_tester = SelectionTester() # Assumes this class exists
 
@@ -64,9 +63,6 @@ class DnDsAnalysis:
 
         # Step 1: Use the provided dataset (filtering assumed done beforehand)
         print(f"Debug (Analysis.run): Using provided dataset with {len(self.dataset.mutations)} mutations, {len(self.dataset.samples)} samples.")
-        if not self.dataset.mutations:
-             print("Debug (Analysis.run): ERROR - Input mutation dataset is empty. Cannot proceed.")
-             return None
 
         # Step 2: Fit trinucleotide model
         print("\nDebug (Analysis.run): Step 2 - Fitting trinucleotide substitution model...")
@@ -206,18 +202,6 @@ class DnDsAnalysis:
             print("Debug (Analysis.run): CRITICAL WARNING - Total expected synonymous count is zero! Check trinucleotide model rates and sequence processing.")
             # Consider stopping or forcing uniform if this happens
         sys.stdout.flush()
-
-
-        # Step 4: Fit negative binomial model (if covariates available)
-        # Skipping this for now as covariates_df is None in the example
-        if self.covariates_df is not None:
-            print("\nDebug (Analysis.run): Step 4 - Fitting negative binomial model (SKIPPED - No covariates provided)...")
-            # print("Fitting negative binomial model...")
-            # self.nb_model.fit(self.dataset.genes, self.covariates_df) # Assumes fit method exists
-        else:
-            print("\nDebug (Analysis.run): Step 4 - Fitting negative binomial model (SKIPPED - No covariates provided)...")
-        sys.stdout.flush()
-
 
         # Step 5: Test for selection
         print("\nDebug (Analysis.run): Step 5 - Testing for selection...")
