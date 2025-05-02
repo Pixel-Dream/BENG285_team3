@@ -103,14 +103,7 @@ class TrinucleotideModel:
 
         # Count observed mutations
         for idx, mutation in enumerate(mutations):
-            # --- Check 1: Get Context ---
-            # Ensure mutation object has get_trinucleotide_context method
-            if not hasattr(mutation, 'get_trinucleotide_context'):
-                 print(f"  >>> Skipping mutation {idx}/{total_to_process}: Mutation object missing 'get_trinucleotide_context' method.")
-                 continue
-
             context = mutation.get_trinucleotide_context(ref_genome)
-            # Context fetch debugging is now inside Mutation class
 
             if not context or not isinstance(context, str) or len(context) != 3:
                 skipped_context += 1
@@ -120,87 +113,69 @@ class TrinucleotideModel:
                     sys.stdout.flush()
                 continue # Skip this mutation
 
-            # --- Check 2: Ref/Alt Alleles (SNV, ACGT) ---
+            # --- Check: Ref/Alt Alleles (SNV, ACGT) ---
             ref = mutation.ref_allele
             alt = mutation.alt_allele
             if not isinstance(ref, str) or not isinstance(alt, str) or \
                len(ref) != 1 or len(alt) != 1 or ref not in "ACGT" or alt not in "ACGT":
                 skipped_non_snv_acgt += 1
                 if debug_counters['fit_skip_non_snv_acgt'] < DEBUG_LIMIT:
-                     print(f"  >>> Skipping mutation {idx}/{total_to_process} ({mutation}): Not SNV or non-ACGT ref/alt. Ref='{ref}', Alt='{alt}'")
-                     debug_counters['fit_skip_non_snv_acgt'] += 1
-                     sys.stdout.flush()
+                    print(f"  >>> Skipping mutation {idx}/{total_to_process} ({mutation}): Not SNV or non-ACGT ref/alt. Ref='{ref}', Alt='{alt}'")
+                    debug_counters['fit_skip_non_snv_acgt'] += 1
+                    sys.stdout.flush()
                 continue # Skip this mutation
 
-            # --- Check 3: Normalization (Handles ambiguous context bases too) ---
+            # --- Check: Normalization (Handles ambiguous context bases too) ---
             norm_ref, norm_alt, norm_context, strand = self._normalize_mutation(ref, alt, context)
             if strand == -1:
-                 skipped_normalize += 1
-                 if debug_counters['fit_skip_normalize'] < DEBUG_LIMIT:
-                      print(f"  >>> Skipping mutation {idx}/{total_to_process} ({mutation}): Failed normalization (non-ACGT base/context or invalid complement). Ref='{ref}', Alt='{alt}', Context='{context}' -> NormRef='{norm_ref}', NormAlt='{norm_alt}', NormCtx='{norm_context}'")
-                      debug_counters['fit_skip_normalize'] += 1
-                      sys.stdout.flush()
-                 continue # Skip this mutation
+                skipped_normalize += 1
+                if debug_counters['fit_skip_normalize'] < DEBUG_LIMIT:
+                    print(f"  >>> Skipping mutation {idx}/{total_to_process} ({mutation}): Failed normalization (non-ACGT base/context or invalid complement). Ref='{ref}', Alt='{alt}', Context='{context}' -> NormRef='{norm_ref}', NormAlt='{norm_alt}', NormCtx='{norm_context}'")
+                    debug_counters['fit_skip_normalize'] += 1
+                    sys.stdout.flush()
+                continue # Skip this mutation
 
-            # --- Check 4: Substitution Key ---
+            # --- Check: Substitution Key ---
             sub_key = f"{norm_ref}>{norm_alt}"
             if sub_key not in self.sub_to_idx:
                 skipped_sub_key += 1
                 if debug_counters['fit_skip_sub_key'] < DEBUG_LIMIT:
-                     print(f"  >>> Skipping mutation {idx}/{total_to_process} ({mutation}): Invalid substitution key after normalization: '{sub_key}' (NormRef='{norm_ref}', NormAlt='{norm_alt}')")
-                     debug_counters['fit_skip_sub_key'] += 1
-                     sys.stdout.flush()
+                    print(f"  >>> Skipping mutation {idx}/{total_to_process} ({mutation}): Invalid substitution key after normalization: '{sub_key}' (NormRef='{norm_ref}', NormAlt='{norm_alt}')")
+                    debug_counters['fit_skip_sub_key'] += 1
+                    sys.stdout.flush()
                 continue # Skip this mutation
 
-            # --- Check 5: Context Key ---
+            # --- Check: Context Key ---
             # Context key uses flanking bases from normalized context and 'N' in middle
             if not isinstance(norm_context, str) or len(norm_context) != 3:
-                 # This case might be caught by normalization check, but double check
-                 skipped_ctx_key += 1
-                 if debug_counters['fit_skip_ctx_key_len'] < DEBUG_LIMIT:
-                      print(f"  >>> Skipping mutation {idx}/{total_to_process} ({mutation}): Invalid normalized context format/length: '{norm_context}'")
-                      debug_counters['fit_skip_ctx_key_len'] += 1
-                      sys.stdout.flush()
-                 continue
-
-            # ***** THE FIX IS HERE *****
-            ctx_key = f"{norm_context[0]}N{norm_context[2]}"
-            # ***************************
-
-            ctx_idx = self.ctx_to_idx.get(ctx_key)
-            if ctx_idx is None:
+                # This case might be caught by normalization check, but double check
                 skipped_ctx_key += 1
-                if debug_counters['fit_skip_ctx_key_lookup'] < DEBUG_LIMIT:
-                     # Print the key we TRIED to look up
-                     print(f"  >>> Skipping mutation {idx}/{total_to_process} ({mutation}): Context key '{ctx_key}' (using 'N') not found in ctx_to_idx map. Check context map init. (NormCtx='{norm_context}', NormRef='{norm_ref}')")
-                     debug_counters['fit_skip_ctx_key_lookup'] += 1
-                     sys.stdout.flush()
-                continue # Skip this mutation
+                if debug_counters['fit_skip_ctx_key_len'] < DEBUG_LIMIT:
+                    print(f"  >>> Skipping mutation {idx}/{total_to_process} ({mutation}): Invalid normalized context format/length: '{norm_context}'")
+                    debug_counters['fit_skip_ctx_key_len'] += 1
+                    sys.stdout.flush()
+                continue
 
+            ctx_key = f"{norm_context[0]}N{norm_context[2]}"
+            ctx_idx = self.ctx_to_idx.get(ctx_key)
 
             # --- If all checks passed ---
             sub_idx = self.sub_to_idx[sub_key]
             # Ensure indices are valid before incrementing (should be if keys were found)
             if 0 <= sub_idx < counts.shape[0] and 0 <= ctx_idx < counts.shape[1] and 0 <= strand < counts.shape[2]:
-                 counts[sub_idx, ctx_idx, strand] += 1
-                 processed_mutations += 1
-                 # Print first few successful ones
-                 if debug_counters['fit_success'] < DEBUG_LIMIT:
-                      print(f"  --- Processed mutation {idx}/{total_to_process} ({mutation}): Context='{context}', NormRef='{norm_ref}', NormAlt='{norm_alt}', NormCtx='{norm_context}', Strand={strand}, SubKey='{sub_key}'(idx={sub_idx}), CtxKey='{ctx_key}'(idx={ctx_idx})")
-                      debug_counters['fit_success'] += 1
-                      sys.stdout.flush()
+                # MAIN LOGIC
+                counts[sub_idx, ctx_idx, strand] += 1
+                processed_mutations += 1
+                # Print first few successful ones
+                if debug_counters['fit_success'] < DEBUG_LIMIT:
+                    print(f"  --- Processed mutation {idx}/{total_to_process} ({mutation}): Context='{context}', NormRef='{norm_ref}', NormAlt='{norm_alt}', NormCtx='{norm_context}', Strand={strand}, SubKey='{sub_key}'(idx={sub_idx}), CtxKey='{ctx_key}'(idx={ctx_idx})")
+                    debug_counters['fit_success'] += 1
+                    sys.stdout.flush()
 
             else:
                  # This would indicate a logic error earlier
                  print(f"  >>> CRITICAL ERROR mutation {idx}/{total_to_process} ({mutation}): Calculated indices out of bounds! sub={sub_idx}, ctx={ctx_idx}, strand={strand}")
                  sys.stdout.flush()
-
-
-            # Optional: Print progress occasionally
-            # if (idx + 1) % 5000 == 0:
-            #     print(f"Debug (TrinucModel.fit): Processed {idx+1}/{total_to_process} mutations...")
-            #     sys.stdout.flush()
-
 
         print(f"\nDebug (TrinucModel.fit): --- Fitting Summary ---")
         print(f"Debug (TrinucModel.fit): Total mutations input: {total_to_process}")
@@ -307,45 +282,3 @@ class TrinucleotideModel:
         # Store in cache
         self.cache[cache_key] = rate
         return rate
-
-
-    # --- get_expected_rates method ---
-    # Relies on the corrected get_rate method
-    def get_expected_rates(self, sequence: str, strand: int = 0) -> Dict[Tuple[int, str], float]:
-        """Calculate expected mutation rates for all possible substitutions in a sequence"""
-        rates = {}
-        # Ensure sequence is string and uppercase
-        if not isinstance(sequence, str): return {}
-        clean_seq = sequence.upper()
-        seq_len = len(clean_seq)
-        if seq_len < 3: return {} # Need at least 3 bases for context
-
-        for i in range(seq_len):
-            ref = clean_seq[i]
-            if ref not in "ACGT": continue # Skip non-ACGT bases
-
-            # Determine context, handling edges with 'N'
-            if i == 0:
-                # Need at least two bases following
-                if seq_len < 2: continue
-                context = "N" + clean_seq[i:i+2]
-            elif i == seq_len - 1:
-                 # Need at least one base preceding
-                 if seq_len < 2: continue
-                 context = clean_seq[i-1:i+1] + "N"
-            else:
-                 # Standard case, need base before and after
-                 context = clean_seq[i-1 : i+2]
-
-            # Ensure context is valid (length 3, no internal 'N' from cleaning)
-            # Note: Edge 'N's are okay here, but get_rate handles internal 'N's
-            if len(context) != 3: continue # Should not happen with logic above
-
-            for alt in "ACGT":
-                if alt != ref:
-                    # get_rate handles normalization, context key fix, and rate lookup
-                    rate = self.get_rate(ref, alt, context)
-                    if rate > 0: # Only store non-zero rates
-                        # Key is (position_index, alt_base)
-                        rates[(i, alt)] = rate
-        return rates

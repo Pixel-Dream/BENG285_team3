@@ -394,79 +394,36 @@ class ReferenceGenome:
         self.method = None
         self.contigs = set() # Store available contig names
 
-        print(f"Debug (RefGenome): Initializing with FASTA: {fasta_file}")
-        try:
-            import pyfaidx
-            print("Debug (RefGenome): Trying pyfaidx...")
-            self.genome = pyfaidx.Fasta(fasta_file)
-            self.method = 'pyfaidx'
-            self.contigs = set(self.genome.keys())
-            print(f"Debug (RefGenome): pyfaidx loaded successfully. Found {len(self.contigs)} contigs.")
-            # Print a few contig names
-            print(f"  Example contigs: {list(self.contigs)[:DEBUG_LIMIT]}")
-        except ImportError:
-            print("Debug (RefGenome): pyfaidx not found.")
+        import pysam
+        if not os.path.exists(fasta_file + ".fai"):
+            print(f"Debug (RefGenome): WARNING - pysam requires an index file ({fasta_file}.fai), attempting to create...")
             try:
-                import pysam
-                print("Debug (RefGenome): Trying pysam...")
-                # pysam requires index (.fai file)
-                if not os.path.exists(fasta_file + ".fai"):
-                     print(f"Debug (RefGenome): WARNING - pysam requires an index file ({fasta_file}.fai), attempting to create...")
-                     try:
-                         pysam.faidx(fasta_file)
-                         print(f"Debug (RefGenome): Index file created.")
-                     except Exception as e:
-                         print(f"Debug (RefGenome): ERROR - Failed to create index file: {e}")
-                         raise ImportError("pysam requires a FASTA index (.fai), and creation failed.")
+                pysam.faidx(fasta_file)
+                print(f"Debug (RefGenome): Index file created.")
+            except Exception as e:
+                print(f"Debug (RefGenome): ERROR - Failed to create index file: {e}")
+                raise ImportError("pysam requires a FASTA index (.fai), and creation failed.")
 
-                self.genome = pysam.FastaFile(fasta_file)
-                self.method = 'pysam'
-                self.contigs = set(self.genome.references)
-                print(f"Debug (RefGenome): pysam loaded successfully. Found {len(self.contigs)} contigs.")
-                print(f"  Example contigs: {list(self.contigs)[:DEBUG_LIMIT]}")
-            except ImportError:
-                print("Debug (RefGenome): pysam not found either.")
-                raise ImportError("ERROR: ReferenceGenome requires either pyfaidx or pysam to be installed.")
-        except Exception as e:
-             print(f"Debug (RefGenome): ERROR - Unexpected error during initialization: {e}")
-             raise # Re-raise the exception
+        self.genome = pysam.FastaFile(fasta_file)
+        self.method = 'pysam'
+        self.contigs = set(self.genome.references)
+        print(f"Debug (RefGenome): pysam loaded successfully. Found {len(self.contigs)} contigs.")
 
     def _check_chrom_format(self, chromosome: str) -> Optional[str]:
          """Check chromosome format and try alternatives"""
          # 1. Try original name
          if chromosome in self.contigs:
               return chromosome
-         # 2. Try adding 'chr' if missing
-         if not chromosome.startswith('chr') and f"chr{chromosome}" in self.contigs:
-              if debug_counters['ref_fetch_add_chr'] < DEBUG_LIMIT:
-                  print(f"  Debug (RefGenome.Fetch): Original chrom '{chromosome}' not found, using 'chr{chromosome}' instead.")
-                  debug_counters['ref_fetch_add_chr'] += 1
-              return f"chr{chromosome}"
-         # 3. Try removing 'chr' if present
-         if chromosome.startswith('chr') and chromosome[3:] in self.contigs:
-              if debug_counters['ref_fetch_rem_chr'] < DEBUG_LIMIT:
-                  print(f"  Debug (RefGenome.Fetch): Original chrom '{chromosome}' not found, using '{chromosome[3:]}' instead.")
-                  debug_counters['ref_fetch_rem_chr'] += 1
-              return chromosome[3:]
-         # 4. Not found
-         if debug_counters['ref_fetch_chrom_not_found'] < DEBUG_LIMIT:
-             print(f"  Debug (RefGenome.Fetch): Chromosome '{chromosome}' (and variants) not found in FASTA contigs: {list(self.contigs)[:DEBUG_LIMIT]}...")
-             debug_counters['ref_fetch_chrom_not_found'] += 1
-         return None
 
 
     def fetch(self, chromosome: str, start: int, end: int) -> Optional[str]:
         """Fetch sequence from reference genome (with debugging)"""
-        if not self.genome:
-            print("Debug (RefGenome.Fetch): ERROR - Genome not loaded.")
-            return None
-
         # Ensure start < end and start >= 0
         if start < 0 or end <= start:
-             if debug_counters['ref_fetch_bad_coords'] < DEBUG_LIMIT:
-                 print(f"  Debug (RefGenome.Fetch): Invalid coordinates for {chromosome}: start={start}, end={end}. Returning None.")
-                 debug_counters['ref_fetch_bad_coords'] += 1
-             return None
+            if debug_counters['ref_fetch_bad_coords'] < DEBUG_LIMIT:
+                print(f"  Debug (RefGenome.Fetch): Invalid coordinates for {chromosome}: start={start}, end={end}. Returning None.")
+                debug_counters['ref_fetch_bad_coords'] += 1
+            return None
 
 
         # Check and potentially adjust chromosome name format
@@ -525,14 +482,7 @@ class GeneAnnotation:
     def __init__(self, gtf_file: Optional[str] = None):
         self.genes: Dict[str, Dict[str, Any]] = {}
         self.gtf_path = gtf_file
-        if gtf_file:
-            print(f"Debug (GeneAnnotation): Initializing with GTF: {gtf_file}")
-            if os.path.exists(gtf_file):
-                self.load_from_gtf(gtf_file)
-            else:
-                 print(f"Debug (GeneAnnotation): ERROR - GTF file not found: {gtf_file}")
-        else:
-             print("Debug (GeneAnnotation): Initialized without GTF file.")
+        self.load_from_gtf(gtf_file)
 
 
     def _extract_attribute(self, attr_str, attr_name):
@@ -554,7 +504,6 @@ class GeneAnnotation:
 
     def load_from_gtf(self, gtf_file: str) -> None:
         """Load gene annotations from GTF file"""
-        print(f"Debug (GeneAnnotation): Loading gene annotations from {gtf_file}...")
         processed_genes = 0
         processed_cds_lines = 0
 
@@ -579,10 +528,6 @@ class GeneAnnotation:
                     names=column_names, dtype=dtypes, chunksize=chunk_size,
                     low_memory=False # Set low_memory=False for mixed types if needed
             )):
-                if (chunk_idx + 1) % 5 == 0: # Print progress every 5 chunks
-                     print(f"  Debug (GeneAnnotation): Processing chunk {chunk_idx+1}...")
-                     sys.stdout.flush()
-
                 # Filter for CDS features ONLY within the chunk
                 cds_chunk = chunk[chunk['feature'] == 'CDS'].copy()
                 processed_cds_lines += len(cds_chunk)
@@ -596,13 +541,13 @@ class GeneAnnotation:
                 # Fallback to gene_id if gene_name is missing
                 missing_name_mask = cds_chunk['gene_name'].isna()
                 if missing_name_mask.any():
-                     cds_chunk.loc[missing_name_mask, 'gene_name'] = cds_chunk.loc[missing_name_mask, 'attributes'].str.extract(r'gene_id "([^"]+)"', expand=False)
+                    cds_chunk.loc[missing_name_mask, 'gene_name'] = cds_chunk.loc[missing_name_mask, 'attributes'].str.extract(r'gene_id "([^"]+)"', expand=False)
 
                 # Drop rows where gene name couldn't be extracted
                 cds_chunk.dropna(subset=['gene_name'], inplace=True)
 
                 if cds_chunk.empty:
-                     continue
+                    continue
 
                 # Extract other info if needed (only once per gene)
                 # This part is tricky with chunking, better done after aggregation
@@ -615,11 +560,11 @@ class GeneAnnotation:
 
                     # Store basic info only once (from the first encountered CDS line for that gene)
                     if not gene_entry['info_set']:
-                         gene_entry['chromosome'] = row['seqname']
-                         gene_entry['strand'] = row['strand']
-                         # Initialize coding_length
-                         gene_entry['coding_length'] = 0
-                         gene_entry['info_set'] = True
+                        gene_entry['chromosome'] = row['seqname']
+                        gene_entry['strand'] = row['strand']
+                        # Initialize coding_length
+                        gene_entry['coding_length'] = 0
+                        gene_entry['info_set'] = True
 
                     # Add exon coordinates and update coding length
                     # Ensure start <= end
