@@ -77,7 +77,7 @@ Rscript permutation_pipeline.R
 ```
 
 ### Benchmark (`benchmark.Rmd`)
-Please download the following data with the following commands:
+Please download the following data (`IntOGen-DriverGenes_LUAD.tsv`, `dndscv_gene_level.csv`, `gene_results_with_am_significance.csv`) with the following commands:
 ```
 bash
 cd data
