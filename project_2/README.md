@@ -89,3 +89,16 @@ gdown https://drive.google.com/file/d/1wUKPJ8sNZdwSmJf9T3O_gUs08RFzoX39/view?usp
 The `gene_results_with_am_significance.csv` file is the output of the `alphamissense` part. It would take a very long time to run the `alphamissense` part, so we provide the result file here.
 
 This benchmark is mainly for plotting the results.
+
+### Evaluation of statistical significance (`evaluation.ipynb`)
+Please download the following data 
+```bash
+cd data
+mkdir evaluation
+gdown https://drive.google.com/file/d/1px_ibOZvY1gxGfKqwOIqcpoHX5uuT4x3/view?usp=drive_link
+gdown https://drive.google.com/file/d/1PH--kwCnnYu2Lb9FfJCupbAvkAy11Onv/view?usp=drive_link
+gdown https://drive.google.com/file/d/1EB-WQv3oje37Q6-GxMQ2mJsYH-HwewV_/view?usp=drive_link
+```
+
+
+
