@@ -23,11 +23,11 @@ library(rlang)
 # 1. Read in data -------------------------------------------------------
 
 # ground truth: single‐column list of known drivers
-gt <- read_tsv("/Users/wengjiaming/Documents/UCSD/2025_spring/BENG285/IntOGen-DriverGenes_LUAD.tsv", col_types = cols()) %>%
+gt <- read_tsv("data/benchmark/IntOGen-DriverGenes_LUAD.tsv", col_types = cols()) %>%
   pull(Symbol)
 
 # dNdSCV results
-dnds <- read_csv("/Users/wengjiaming/Downloads/dndscv_gene_level.csv", col_types = cols()) %>%
+dnds <- read_csv("data/benchmark/dndscv_gene_level.csv", col_types = cols()) %>%
   mutate(called = qglobal_cv < 0.1) %>%
   select(gene = gene_name, called)
 
@@ -45,7 +45,7 @@ perm_fdr <- tibble(
 )
 
 # Trinucleotide & Alphamissense results
-g <- read_csv("/Volumes/T7_Shield/Lab/T7_UCSD/github_repos/BENG285_team3/project_2/alphamissense/gene_results_with_am_significance.csv", col_types = cols()) 
+g <- read_csv("data/benchmark/gene_results_with_am_significance.csv", col_types = cols()) 
 
 trinuc   <- g %>% select(gene = gene_name, called = significant)
 amiss    <- g %>% select(gene = gene_name, called = am_significant)
@@ -162,46 +162,5 @@ ggplot(m_long, aes(x = method, y = value, fill = metric)) +
     panel.grid.major.x  = element_blank(),
     panel.grid.major.y  = element_line(color = "grey90")
   )
-```
-
-
-```{r}
-# library(PRROC)
-# 
-# # 1. Read ground-truth and results
-# gt <- read_tsv("/Users/wengjiaming/Documents/UCSD/2025_spring/BENG285/IntOGen-DriverGenes_LUAD.tsv", col_types = cols()) %>%
-#   pull(Symbol)        # ground-truth driver vector :contentReference[oaicite:2]{index=2}
-# 
-# scores <- read_csv("/Users/wengjiaming/Downloads/dndscv_gene_level.csv",
-#                    col_types = cols()) %>%
-#   transmute(
-#     gene_name,
-#     score = -qglobal_cv,        # invert so that higher = more driver-like :contentReference[oaicite:3]{index=3}
-#     truth = gene_name %in% gt
-#   )
-# 
-# # 2. Split into positive (drivers) and negative (non-drivers) scores
-# pos_scores <- scores$score[scores$truth]   # true positives :contentReference[oaicite:4]{index=4}
-# neg_scores <- scores$score[!scores$truth]  # true negatives :contentReference[oaicite:5]{index=5}
-# 
-# # 3. Compute ROC and PR curves (must use scores.class0 & scores.class1)
-# roc_obj <- roc.curve(
-#   scores.class0 = pos_scores,
-#   scores.class1 = neg_scores,
-#   curve        = TRUE
-# )  # S3 method from PRROC :contentReference[oaicite:6]{index=6}
-# 
-# pr_obj  <- pr.curve(
-#   scores.class0 = pos_scores,
-#   scores.class1 = neg_scores,
-#   curve        = TRUE
-# )  # precision–recall curve :contentReference[oaicite:7]{index=7}
-# 
-# # 4. Plot side by side
-# par(mfrow=c(1,2), mar=c(4,4,2,1), cex=0.7)  # two-panel display :contentReference[oaicite:8]{index=8}
-# plot(roc_obj, main="dNdSCV ROC")            # ROC from PRROC :contentReference[oaicite:9]{index=9}
-# plot(pr_obj,  main="dNdSCV Precision-Recall")  # PR curve :contentReference[oaicite:10]{index=10}
-# 
-
 ```
 
