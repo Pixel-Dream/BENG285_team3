@@ -11,3 +11,12 @@ project_2/dNdSpy/results_directory_debug_final/
 project_2/dNdSpy/results_directory_debug_final_2/
 project_2/dNdSpy/results_directory_debug_2/
 project_2/dNdSpy/results_directory_debug/
+project_2/dNdSpy/results_directory_neg_null/
+
+project_2/data/
+
+project_2/.pybiomart.sqlite
+
+project_2/results/
+
+project_2/dNdSpy/__pycache__

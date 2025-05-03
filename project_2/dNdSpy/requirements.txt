@@ -1,3 +1,0 @@
-gtfparse
-pysam
-ipywidgets
