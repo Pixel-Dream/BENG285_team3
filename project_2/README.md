@@ -73,7 +73,7 @@ The permutation method is implemented in the `permutation_pipeline.R` file. And 
 
 To run:
 ```bash
-Rscript permutation_pipeline.R
+Rscript permutation_pipeline.R path_to_annotation output_path 2000
 ```
 
 ### Benchmark (`benchmark.Rmd`)
@@ -99,6 +99,6 @@ gdown https://drive.google.com/file/d/1px_ibOZvY1gxGfKqwOIqcpoHX5uuT4x3/view?usp
 gdown https://drive.google.com/file/d/1PH--kwCnnYu2Lb9FfJCupbAvkAy11Onv/view?usp=drive_link
 gdown https://drive.google.com/file/d/1EB-WQv3oje37Q6-GxMQ2mJsYH-HwewV_/view?usp=drive_link
 ```
-
+The `evaluation.ipynb` file can be run to evaluate statistical significance of the results and used to directly visualize nonsynonymous mutation q-values vs. driver mutation posterior probabilities under mixture models. This file also contains code to plot a Venn diagram of the overlap between the driver genes identified by listed approaches.
 
 
