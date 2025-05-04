@@ -1,0 +1,20 @@
+gdown
+
+# data_preprocessing.py
+pandas
+pybiomart
+
+# liftover.py
+pyliftover
+pysam
+
+gtfparse
+ipywidgets
+
+# dNdSpy
+tqdm
+statsmodels
+
+# alphamissense
+matplotlib
+seaborn
