@@ -1,65 +1,76 @@
 import os
+import sys
 import pandas as pd
-import pysam
-import pyfaidx
 import numpy as np
 from collections import defaultdict
 import argparse
-import sys
 
-def extract_mutations_from_vcf(vcf_file, genome_ref_fasta, sample_name=None):
+def process_maf_file(maf_file):
     """
-    Extract single base substitutions from a VCF file using pysam.
+    Extract single base substitutions from a MAF file.
     
     Args:
-        vcf_file: Path to VCF file
-        genome_ref_fasta: Path to reference genome fasta file
-        sample_name: Optional name for the sample (defaults to filename)
+        maf_file: Path to MAF file
         
     Returns:
-        List of mutations with context information
+        Dictionary mapping sample names to lists of mutations
     """
-    # Load reference genome
-    genome = pyfaidx.Fasta(genome_ref_fasta)
+    # Read the MAF file
+    maf_df = pd.read_csv(maf_file, sep='\t', comment='#')
     
-    # If sample name not provided, use filename without extension
-    if sample_name is None:
-        sample_name = os.path.splitext(os.path.basename(vcf_file))[0]
+    # Dictionary to store mutations for each sample
+    mutation_lists = defaultdict(list)
     
-    # Parse VCF file with pysam
-    vcf_reader = pysam.VariantFile(vcf_file, 'r')
-    mutations = []
-    
-    for record in vcf_reader:
-        # Get basics: CHROM, POS, REF, ALT
-        chrom = record.chrom
-        pos = record.pos  # 1-based position in pysam
-        ref = record.ref
-        
-        # Only process SNVs (single nucleotide variants)
-        if len(ref) == 1 and len(record.alts) > 0 and len(record.alts[0]) == 1:
-            alt = record.alts[0]
+    # Process each row in the MAF file
+    for _, row in maf_df.iterrows():
+        # Only process SNPs (single nucleotide variants)
+        if row['Variant_Type'] == 'SNP':
+            sample_name = row['Tumor_Sample_Barcode']
             
-            # Get trinucleotide context (the nucleotide before and after the mutation)
-            try:
-                # Get the +/- 1 nucleotide context (adjust for 0-based indexing)
-                context = str(genome[chrom][pos-2:pos+1].seq).upper()
-                if len(context) == 3:
-                    mutations.append({
-                        'sample': sample_name,
-                        'chrom': chrom,
-                        'pos': pos,
-                        'ref': ref,
-                        'alt': alt,
-                        'context': context
-                    })
-            except:
-                # Skip if we can't get proper context (e.g., at chromosome boundaries)
+            # Get the context - should be 11 bases (5 + ref + 5)
+            context = row['CONTEXT']
+            ref = row['Reference_Allele']
+            
+            # Skip if context or reference is missing
+            if not context or not ref:
                 continue
+                
+            # Ensure the reference allele is a single nucleotide
+            if len(ref) != 1:
+                continue
+            
+            # For 11-base context (standard MAF format)
+            if len(context) == 11:
+                # Reference should be at position 5 (0-indexed)
+                center_pos = 5
+                trinucleotide_context = context[center_pos-1:center_pos+2]
+            else:
+                # For non-standard context lengths, try to find where the reference allele is
+                center_pos = len(context) // 2
+                trinucleotide_context = context[center_pos-1:center_pos+2] if center_pos > 0 and center_pos < len(context) - 1 else None
+            
+            # Verify we have a valid trinucleotide context
+            if trinucleotide_context and len(trinucleotide_context) == 3:
+                alt = row['Tumor_Seq_Allele2']
+                
+                # Verify alt is a single nucleotide
+                if len(alt) != 1:
+                    continue
+                
+                # Store the mutation with expected middle base
+                mutation_lists[sample_name].append({
+                    'sample': sample_name,
+                    'chrom': row['Chromosome'],
+                    'pos': row['Start_Position'],
+                    'ref': ref,
+                    'alt': alt,
+                    'context': trinucleotide_context,
+                    'expected_middle': ref  # Store expected middle base for validation
+                })
     
-    return mutations
+    return mutation_lists
 
-def classify_mutation(context, ref, alt):
+def classify_mutation(context, ref, alt, expected_middle=None):
     """
     Classify a mutation in the SBS-96 scheme.
     
@@ -67,12 +78,36 @@ def classify_mutation(context, ref, alt):
         context: Trinucleotide context (e.g., 'ACA')
         ref: Reference base (middle of context)
         alt: Alternate base
+        expected_middle: The expected middle base (to verify context)
         
     Returns:
         Mutation class in the format of "C>A:ACA"
     """
+    # Convert to uppercase for consistency
+    ref = ref.upper()
+    alt = alt.upper()
+    context = context.upper()
+    
     # Verify the middle base of context matches the reference
-    assert context[1] == ref, f"Reference base mismatch: {context[1]} vs {ref}"
+    middle_base = context[1]
+    
+    # If middle base doesn't match reference, try to fix it
+    if middle_base != ref:
+        # If we have an expected middle base and it matches the reference,
+        # something is wrong with the context
+        if expected_middle and expected_middle.upper() == ref:
+            # Try reverse complement in case context is on opposite strand
+            complement = {'A': 'T', 'T': 'A', 'C': 'G', 'G': 'C'}
+            rev_comp_context = ''.join([complement[base] for base in reversed(context)])
+            
+            if rev_comp_context[1] == ref:
+                context = rev_comp_context
+            else:
+                # If still no match, can't classify this mutation
+                return None
+        else:
+            # No expected middle or it doesn't match ref either
+            return None
     
     # SBS classifications are based on pyrimidine reference bases (C, T)
     # If reference is a purine (A, G), convert to its complementary base
@@ -132,57 +167,51 @@ def create_sbs_matrix(mutation_lists, matrix_type='SBS96'):
     samples = list(mutation_lists.keys())
     counts = np.zeros((len(mutation_types), len(samples)), dtype=int)
     
+    # Counters for tracking
+    total_mutations = 0
+    classified_mutations = 0
+    
     # Fill in the matrix
     for sample_idx, sample in enumerate(samples):
         sample_mutations = mutation_lists[sample]
         for mutation in sample_mutations:
+            total_mutations += 1
             context = mutation['context']
             ref = mutation['ref']
             alt = mutation['alt']
+            expected_middle = mutation.get('expected_middle')
             
-            mutation_class = classify_mutation(context, ref, alt)
-            if mutation_class in mutation_types:
-                mutation_idx = mutation_types.index(mutation_class)
-                counts[mutation_idx, sample_idx] += 1
+            try:
+                mutation_class = classify_mutation(context, ref, alt, expected_middle)
+                if mutation_class and mutation_class in mutation_types:
+                    mutation_idx = mutation_types.index(mutation_class)
+                    counts[mutation_idx, sample_idx] += 1
+                    classified_mutations += 1
+            except Exception as e:
+                # Skip mutations that can't be classified
+                continue
+    
+    print(f"Successfully classified {classified_mutations} out of {total_mutations} mutations")
     
     # Create DataFrame
     sbs_matrix = pd.DataFrame(counts, index=mutation_types, columns=samples)
     return sbs_matrix
 
-def process_vcf_directory(vcf_dir, genome_ref_fasta, output_file=None):
+def process_single_maf_file(maf_file, output_file=None):
     """
-    Process all VCF files in a directory and generate an SBS matrix.
+    Process a single MAF file and generate an SBS matrix.
     
     Args:
-        vcf_dir: Directory containing VCF files
-        genome_ref_fasta: Path to reference genome fasta file
+        maf_file: Path to MAF file
         output_file: Optional path to save the output matrix as CSV
         
     Returns:
         DataFrame containing the SBS matrix
     """
-    # Find all VCF files
-    vcf_files = [f for f in os.listdir(vcf_dir) if f.endswith('.vcf') or f.endswith('.vcf.gz')]
+    print(f"Processing MAF file: {maf_file}")
     
-    if not vcf_files:
-        raise ValueError(f"No VCF files found in {vcf_dir}")
-    
-    print(f"Found {len(vcf_files)} VCF files to process")
-    
-    # Process each VCF file
-    mutation_lists = {}
-    for vcf_file in vcf_files:
-        sample_name = os.path.splitext(vcf_file)[0].replace('.vcf', '')  # Handle both .vcf and .vcf.gz
-        print(f"Processing {vcf_file} as sample {sample_name}...")
-        
-        mutations = extract_mutations_from_vcf(
-            os.path.join(vcf_dir, vcf_file),
-            genome_ref_fasta,
-            sample_name
-        )
-        
-        mutation_lists[sample_name] = mutations
-        print(f"  Found {len(mutations)} SNVs in {sample_name}")
+    # Process the MAF file
+    mutation_lists = process_maf_file(maf_file)
     
     # Create SBS matrix
     print("Generating SBS-96 matrix...")
@@ -193,32 +222,87 @@ def process_vcf_directory(vcf_dir, genome_ref_fasta, output_file=None):
         sbs_matrix.to_csv(output_file)
         print(f"SBS matrix saved to {output_file}")
     
+    # Print some statistics
+    print(f"Generated SBS matrix with {sbs_matrix.shape[0]} mutation types and {sbs_matrix.shape[1]} samples")
+    print(f"Total mutations per sample:")
+    for sample in sbs_matrix.columns:
+        print(f"  {sample}: {sbs_matrix[sample].sum()} mutations")
+    
     return sbs_matrix
 
+def process_maf_directory(maf_dir, output_file=None):
+    """
+    Process all MAF files in a directory and generate an SBS matrix.
+    
+    Args:
+        maf_dir: Directory containing MAF files
+        output_file: Optional path to save the output matrix as CSV
+        
+    Returns:
+        DataFrame containing the SBS matrix
+    """
+    # Find all MAF files
+    maf_files = [f for f in os.listdir(maf_dir) if f.endswith('.maf')]
+    
+    if not maf_files:
+        raise ValueError(f"No MAF files found in {maf_dir}")
+    
+    print(f"Found {len(maf_files)} MAF files to process")
+    
+    # Process each MAF file
+    all_mutations = {}
+    for maf_file in maf_files:
+        print(f"Processing {maf_file}...")
+        
+        mutation_lists = process_maf_file(os.path.join(maf_dir, maf_file))
+        all_mutations.update(mutation_lists)
+    
+    # Create SBS matrix
+    print("Generating SBS-96 matrix...")
+    sbs_matrix = create_sbs_matrix(all_mutations)
+    
+    # Save matrix if output file is specified
+    if output_file:
+        sbs_matrix.to_csv(output_file)
+        print(f"SBS matrix saved to {output_file}")
+    
+    return sbs_matrix
 
 def main():
-    parser = argparse.ArgumentParser(description='Generate an SBS-96 matrix from VCF files')
-    parser.add_argument('--vcf_dir', required=True, help='Directory containing VCF files')
-    parser.add_argument('--ref_genome', required=True, help='Path to reference genome FASTA file')
+    """
+    Main function to parse arguments and process MAF files
+    """
+    parser = argparse.ArgumentParser(description='Generate an SBS-96 matrix from MAF files')
+    parser.add_argument('--maf_file', help='Path to a single MAF file')
+    parser.add_argument('--maf_dir', help='Directory containing MAF files')
     parser.add_argument('--output', required=True, help='Output file path for the SBS matrix (CSV)')
     
     args = parser.parse_args()
     
-    # Process all VCF files and generate the SBS matrix
     try:
-        sbs_matrix = process_vcf_directory(args.vcf_dir, args.ref_genome, args.output)
-        
-        # Print some statistics
-        print(f"Generated SBS matrix with {sbs_matrix.shape[0]} mutation types and {sbs_matrix.shape[1]} samples")
-        print(f"Total mutations per sample:")
-        for sample in sbs_matrix.columns:
-            print(f"  {sample}: {sbs_matrix[sample].sum()} mutations")
+        if args.maf_file:
+            # Process a single MAF file
+            if not os.path.isfile(args.maf_file):
+                print(f"Error: MAF file not found: {args.maf_file}")
+                return 1
+                
+            sbs_matrix = process_single_maf_file(args.maf_file, args.output)
+        elif args.maf_dir:
+            # Process all MAF files in a directory
+            if not os.path.isdir(args.maf_dir):
+                print(f"Error: Directory not found: {args.maf_dir}")
+                return 1
+                
+            sbs_matrix = process_maf_directory(args.maf_dir, args.output)
+        else:
+            print("Error: Either --maf_file or --maf_dir must be specified")
+            parser.print_help()
+            return 1
             
+        return 0
     except Exception as e:
-        print(f"Error: {e}", file=sys.stderr)
+        print(f"Error: {e}")
         return 1
-    
-    return 0
 
 if __name__ == "__main__":
-    sys.exit(main())
+    main()
