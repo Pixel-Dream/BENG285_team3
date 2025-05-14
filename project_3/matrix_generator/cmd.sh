@@ -1,1 +1,1 @@
-python generate_sbs_matrix.py --vcf_dir /Users/xbh0403/Desktop/25SP/BENG285/BENG285_team3/project_3/data/vcf_input --ref_genome /Users/xbh0403/Desktop/25SP/BENG285/BENG285_team3/project_3/data/hg19.fa --output /Users/xbh0403/Desktop/25SP/BENG285/BENG285_team3/project_3/output/sbs_matrix.csv
+python generate_sbs_matrix.py --vcf_dir /Users/xbh0403/Desktop/25SP/BENG285/BENG285_team3/project_3/data/vcf_input --output /Users/xbh0403/Desktop/25SP/BENG285/BENG285_team3/project_3/output/sbs_matrix.csv
