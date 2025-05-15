@@ -24,8 +24,8 @@ def process_maf_file(maf_file):
     # Process each row in the MAF file
     for _, row in maf_df.iterrows():
         # Only process SNPs (single nucleotide variants)
-        if row['Variant_Type'] == 'SNP':
-            sample_name = row['Tumor_Sample_Barcode']
+        if row['Variant_Type'] == 'SNP' and row['FILTER'] == 'PASS':
+            sample_name = row['patient_id']
             
             # Get the context - should be 11 bases (5 + ref + 5)
             context = row['CONTEXT']
@@ -81,7 +81,7 @@ def classify_mutation(context, ref, alt, expected_middle=None):
         expected_middle: The expected middle base (to verify context)
         
     Returns:
-        Mutation class in the format of "C>A:ACA"
+        Mutation class in the format of "A[C>A]A"
     """
     # Convert to uppercase for consistency
     ref = ref.upper()
@@ -119,10 +119,10 @@ def classify_mutation(context, ref, alt, expected_middle=None):
         new_ref = purine_to_pyrimidine[ref]
         new_alt = complement[alt]
         new_context = ''.join([complement[base] for base in reversed(context)])
-        return f"{new_ref}>{new_alt}:{new_context}"
+        return f"{new_context[0]}[{new_ref}>{new_alt}]{new_context[2]}"
     else:
         # Already pyrimidine reference
-        return f"{ref}>{alt}:{context}"
+        return f"{context[0]}[{ref}>{alt}]{context[2]}"
 
 def generate_sbs96_mutation_types():
     """
@@ -142,7 +142,7 @@ def generate_sbs96_mutation_types():
                 for upstream in nucleotides:
                     for downstream in nucleotides:
                         context = upstream + ref + downstream
-                        mutation_types.append(f"{ref}>{alt}:{context}")
+                        mutation_types.append(f"{upstream}[{ref}>{alt}]{downstream}")
     
     return sorted(mutation_types)
 
@@ -219,7 +219,7 @@ def process_single_maf_file(maf_file, output_file=None):
     
     # Save matrix if output file is specified
     if output_file:
-        sbs_matrix.to_csv(output_file)
+        sbs_matrix.to_csv(output_file, sep='\t')
         print(f"SBS matrix saved to {output_file}")
     
     # Print some statistics
@@ -274,7 +274,6 @@ def main():
     """
     parser = argparse.ArgumentParser(description='Generate an SBS-96 matrix from MAF files')
     parser.add_argument('--maf_file', help='Path to a single MAF file')
-    parser.add_argument('--maf_dir', help='Directory containing MAF files')
     parser.add_argument('--output', required=True, help='Output file path for the SBS matrix (CSV)')
     
     args = parser.parse_args()
@@ -287,13 +286,6 @@ def main():
                 return 1
                 
             sbs_matrix = process_single_maf_file(args.maf_file, args.output)
-        elif args.maf_dir:
-            # Process all MAF files in a directory
-            if not os.path.isdir(args.maf_dir):
-                print(f"Error: Directory not found: {args.maf_dir}")
-                return 1
-                
-            sbs_matrix = process_maf_directory(args.maf_dir, args.output)
         else:
             print("Error: Either --maf_file or --maf_dir must be specified")
             parser.print_help()
