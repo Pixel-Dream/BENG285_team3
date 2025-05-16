@@ -1,5 +1,7 @@
 import pandas as pd
 import re
+import numpy as np
+from scipy.stats import pearsonr, spearmanr
 
 sig_profiler_matrix = pd.read_csv("/Users/xbh0403/Desktop/25SP/BENG285/BENG285_team3/project_3/data/vcf_filtered/output/SBS/project_3.SBS96.exome", sep="\t")
 # Remove filter_status column
@@ -15,10 +17,6 @@ sig_cols = list(sig_profiler_matrix.columns)
 sig_cols_short = [re.sub(r'(TCGA-\w{2}-\w{4})-.*', r'\1', col) if col != 'MutationType' else col for col in sig_cols]
 sig_profiler_matrix.columns = sig_cols_short
 sig_profiler_matrix.head()
-
-
-import numpy as np
-from scipy.stats import pearsonr, spearmanr
 
 # First check if the columns match between the two matrices
 try:
