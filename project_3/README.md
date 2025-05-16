@@ -35,12 +35,15 @@ Our NMF-based mutational signature extractor algorithm is implemented in `NMF.ip
 ```bash
 python run_SigProfilerExtracter.py
 ```
-This code will generate a folder `SigProfilerResults/SigProfilerExtractorResults` containing the results of the signature extraction.
+This code will generate a folder `SigProfilerResults/SigProfilerExtractorResultsWithCosmic` containing the results of the signature extraction.
 
 ### SigProfilerAssignment
 ```bash
 python run_SigProfilerAssignment.py \
     -i ./parameter_search_our_results/W_optim_k_4.tsv \
-    -o ./SigProfilerResults/SigProfilerAssignmentResults
+    -o ./SigProfilerResults/SigProfilerAssignmentResultsWithCosmic
 ```
 This code will generate a folder `SigProfilerResults/SigProfilerAssignmentResults` containing the results of the signature assignment.
+
+### Benchmark between our algorithm and SigProfiler
+Please use the R script `benchmark/proj3.R` to benchmark the results between our algorithm and SigProfiler.
