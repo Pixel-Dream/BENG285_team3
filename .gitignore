@@ -17,7 +17,7 @@ project_2/.pybiomart.sqlite
 project_2/results/
 project_2/dNdSpy/__pycache__
 
-project_3/data/
+project_3/data/vcf_filtered/
 project_3/matrix_generator/__pycache__
 project_3/output/
 project_3/matrix_generator/__pycache__

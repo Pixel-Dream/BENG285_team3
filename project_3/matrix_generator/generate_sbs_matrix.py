@@ -284,7 +284,7 @@ def main():
             if not os.path.isfile(args.maf_file):
                 print(f"Error: MAF file not found: {args.maf_file}")
                 return 1
-                
+            os.makedirs(os.path.dirname(args.output), exist_ok=True)
             sbs_matrix = process_single_maf_file(args.maf_file, args.output)
         else:
             print("Error: Either --maf_file or --maf_dir must be specified")
