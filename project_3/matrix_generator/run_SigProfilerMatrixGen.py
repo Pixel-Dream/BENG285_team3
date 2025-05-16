@@ -9,8 +9,8 @@ from SigProfilerMatrixGenerator.scripts import SigProfilerMatrixGeneratorFunc as
 def main_function():
     genInstall.install('GRCh37', rsync=False, bash=True)
     matrices = matGen.SigProfilerMatrixGeneratorFunc("project_3", "GRCh37", 
-                                                    "data/vcf_filtered",
-                                                    plot=True, exome=True, 
+                                                    "../data/vcf_filtered",
+                                                    plot=False, exome=True, 
                                                     bed_file=None, chrom_based=False, 
                                                     tsb_stat=False, seqInfo=False, 
                                                     cushion=100)
