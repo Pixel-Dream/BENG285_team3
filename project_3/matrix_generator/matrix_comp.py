@@ -3,11 +3,11 @@ import re
 import numpy as np
 from scipy.stats import pearsonr, spearmanr
 
-sig_profiler_matrix = pd.read_csv("/Users/xbh0403/Desktop/25SP/BENG285/BENG285_team3/project_3/data/vcf_filtered/output/SBS/project_3.SBS96.exome", sep="\t")
+sig_profiler_matrix = pd.read_csv("../data/vcf_filtered/output/SBS/project_3.SBS96.exome", sep="\t")
 # Remove filter_status column
 sig_profiler_matrix = sig_profiler_matrix.drop(columns=["filter_stats"])
 # Set index to MutationType
-our_matrix = pd.read_csv("/Users/xbh0403/Desktop/25SP/BENG285/BENG285_team3/project_3/output/sbs_96_matrix_our_code.tsv", sep="\t")
+our_matrix = pd.read_csv("../output/sbs_96_matrix.tsv", sep="\t")
 new_columns = our_matrix.columns.tolist()
 new_columns[0] = "MutationType"
 our_matrix.columns = new_columns

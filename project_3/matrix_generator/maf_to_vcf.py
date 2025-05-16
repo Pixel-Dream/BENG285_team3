@@ -259,7 +259,5 @@ def convert_snp_pass_to_vcfs(input_file, output_dir):
     return stats
 
 
-if __name__ == "__main__":
-    input_file = "/Users/xbh0403/Desktop/25SP/BENG285/BENG285_team3/project_2/data/TCGA.LUAD.mutations.txt"
-    output_dir = "/Users/xbh0403/Desktop/25SP/BENG285/BENG285_team3/project_3/data/vcf_filtered2"
-    convert_snp_pass_to_vcfs(input_file, output_dir)
+if __name__ == "__main__":    
+    convert_snp_pass_to_vcfs("../data/TCGA.LUAD.mutations.txt", "../data/vcf_filtered")
