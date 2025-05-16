@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Assign COSMIC signatures to an SBS-96 matrix originally in CSV form.
-This script reads the CSV, writes a temporary TSV, and runs cosmic_fit.
+Assign COSMIC signatures to an SBS-96 matrix in CSV or TSV form.
+This script reads the matrix, ensures a TSV version exists, and runs cosmic_fit.
 """
 import argparse
 import os
@@ -10,11 +10,11 @@ from SigProfilerAssignment import Analyzer as Analyze
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Convert CSV→TSV and assign COSMIC signatures with SigProfilerAssignment"
+        description="Convert CSV/TSV→TSV and assign COSMIC signatures with SigProfilerAssignment"
     )
     parser.add_argument(
         "-i", "--input", required=True,
-        help="Path to input CSV file (comma-separated SBS96 matrix)"
+        help="Path to input file (CSV or TSV SBS96 matrix)"
     )
     parser.add_argument(
         "-o", "--output", default="assignment_output",
@@ -30,28 +30,38 @@ def main():
     )
     args = parser.parse_args()
 
-    # 1. Read the comma-separated CSV
-    df = pd.read_csv(args.input, sep=",", header=0)  # header row: MutationType + sample IDs :contentReference[oaicite:3]{index=3}
+    base, ext = os.path.splitext(args.input)
+    ext = ext.lower()
+    # Choose delimiter and TSV path
+    if ext in (".tsv", ".txt"):
+        sep_in = "\t"
+        tsv_path = args.input
+    else:
+        sep_in = ","
+        tsv_path = f"{base}.tsv"
 
-    # 2. Write out as a tab-delimited TSV
-    tsv_path = os.path.splitext(args.input)[0] + ".tsv"
-    df.to_csv(tsv_path, sep="\t", index=False)         # convert CSV→TSV :contentReference[oaicite:4]{index=4}
+    # Read matrix with appropriate separator
+    df = pd.read_csv(args.input, sep=sep_in, header=0)
 
-    # 3. Run SigProfilerAssignment on the TSV
+    # If original was CSV, write out TSV
+    if sep_in == ",":
+        df.to_csv(tsv_path, sep="\t", index=False)
+
+    # Run SigProfilerAssignment on the TSV
     Analyze.cosmic_fit(
         samples=tsv_path,
         output=args.output,
-        input_type="matrix",        # matrix of trinucleotide counts :contentReference[oaicite:5]{index=5}
+        input_type="matrix",
         context_type=args.context_type,
         cosmic_version=args.cosmic_version,
-        make_plots=True             # toggle on QC plots
+        make_plots=True
     )
 
     print(f"Done: results in '{args.output}'")
 
 if __name__ == "__main__":
     main()
-# run wit:
+# run with:
 # python run_SigProfilerAssignment.py \
-    # -i ./W_K5.csv \
-    # -o ./assignment_output
+#     -i ./W_optim_k_4.tsv \
+#     -o ./assignment_output_opt
