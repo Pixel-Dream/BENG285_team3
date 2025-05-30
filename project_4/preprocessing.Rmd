@@ -1,0 +1,161 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+
+```{r}
+# R SCRIPT FOR TCGA LUAD SURVIVAL ANALYSIS WITH COVARIATES (MODIFIED FILTERING)
+
+# --- 1. Load Libraries ---
+# install.packages(c("survival", "dplyr", "stringr", "readr")) # Run once if not installed
+library(survival)
+library(dplyr)
+library(stringr)
+library(readr) # For readr::write_csv
+
+# --- 2. Load Metadata ---
+# Ensure "TCGA.LUAD.metadata.txt" is in your R working directory or provide the full path.
+metadata_file <- "TCGA.LUAD.metadata.txt"
+if (!file.exists(metadata_file)) {
+  stop(paste("Metadata file not found:", metadata_file,
+             "\nPlease ensure it's in the working directory or provide the correct path."))
+}
+# Define strings that should be treated as NA. This includes "[Not Available]" for race.
+na_strings_custom <- c("", "NA", "[Not Available]", "[Unknown]", "[Not Applicable]", "[Discrepancy]", "[Not Evaluated]")
+luad_metadata_raw <- read.delim(metadata_file, header = TRUE, sep = "\t", stringsAsFactors = FALSE, na.strings = na_strings_custom)
+
+# --- 3. Select and Rename Initial Columns ---
+# Select all columns that will be involved in filtering or analysis.
+# Renaming some for convenience.
+analysis_data <- luad_metadata_raw %>%
+  select(
+    patient_id,
+    OS, OS.time, # Overall Survival
+    PFI, PFI.time, # Progression-Free Interval
+    age_at_initial_pathologic_diagnosis,
+    gender,
+    race,
+    ajcc_pathologic_tumor_stage,
+  ) %>%
+  rename(
+    age = age_at_initial_pathologic_diagnosis
+    # ajcc_pathologic_tumor_stage will be filtered using its original name
+  )
+
+# --- 4. Apply User-Specified Filtering Rules ---
+# Convert potential character/factor columns to appropriate types before filtering where necessary
+# (e.g. OS.time, PFI.time, age should be numeric to check >= 0)
+analysis_data <- analysis_data %>%
+  mutate(
+    OS.time = as.numeric(as.character(OS.time)),
+    OS = as.integer(as.character(OS)),
+    PFI.time = as.numeric(as.character(PFI.time)),
+    PFI = as.integer(as.character(PFI)),
+    age = as.numeric(as.character(age))
+  )
+
+cat("Dimensions before explicit filtering:", dim(analysis_data), "\n")
+
+analysis_data_filtered <- analysis_data %>%
+  filter(
+    # Rule 1: Not NA in OS and OS.time, and OS.time is valid
+    !is.na(OS) & !is.na(OS.time) & OS.time >= 0,
+    # Rule 2: Not NA in PFI and PFI.time, and PFI.time is valid
+    !is.na(PFI) & !is.na(PFI.time) & PFI.time >= 0,
+    # Rule 3: Not NA in age (derived from age_at_initial_pathologic_diagnosis)
+    !is.na(age),
+    # Rule 4: Not NA in race (catches "[Not Available]" converted by na.strings)
+    !is.na(race),
+    # Rule 5: ajcc_pathologic_tumor_stage is not NA AND starts with "Stage "
+    !is.na(ajcc_pathologic_tumor_stage) & str_starts(ajcc_pathologic_tumor_stage, "Stage ")
+  )
+
+cat("Dimensions after explicit filtering:", dim(analysis_data_filtered), "\n")
+if(nrow(analysis_data_filtered) == 0) {
+  stop("No rows remaining after applying the specified filters. Please check your data and filter criteria.")
+}
+
+# --- 5. Clean Remaining Covariates on the Filtered Data ---
+
+# Gender: Convert to factor. Set a reference level (e.g., FEMALE).
+analysis_data_cleaned <- analysis_data_filtered %>%
+  mutate(gender = toupper(gender)) %>% # Standardize case
+  mutate(gender = factor(gender))
+if (nlevels(analysis_data_cleaned$gender) > 1 && "FEMALE" %in% levels(analysis_data_cleaned$gender)) {
+  analysis_data_cleaned$gender <- relevel(analysis_data_cleaned$gender, ref = "FEMALE")
+}
+
+# Race: Convert to factor (already filtered for NAs).
+analysis_data_cleaned <- analysis_data_cleaned %>%
+  mutate(race = factor(race))
+if (nlevels(analysis_data_cleaned$race) > 1 && "WHITE" %in% levels(analysis_data_cleaned$race)) {
+  analysis_data_cleaned$race <- relevel(analysis_data_cleaned$race, ref = "WHITE")
+}
+
+# Tumor Stage (ajcc_pathologic_tumor_stage):
+# Simplify to main stages (I, II, III, IV) from the already filtered 'ajcc_pathologic_tumor_stage'.
+# The filter in step 4 ensures it starts with "Stage ".
+analysis_data_cleaned <- analysis_data_cleaned %>%
+  mutate(
+    stage_simplified = case_when(
+      str_detect(ajcc_pathologic_tumor_stage, regex("Stage IV", ignore_case = TRUE)) ~ "Stage IV",
+      str_detect(ajcc_pathologic_tumor_stage, regex("Stage III", ignore_case = TRUE)) ~ "Stage III",
+      str_detect(ajcc_pathologic_tumor_stage, regex("Stage II", ignore_case = TRUE)) ~ "Stage II",
+      str_detect(ajcc_pathologic_tumor_stage, regex("Stage I", ignore_case = TRUE)) ~ "Stage I",
+      TRUE ~ NA_character_ # Should catch any "Stage ..." that isn't I, II, III, or IV
+    ),
+    stage_simplified = factor(stage_simplified,
+                              levels = c("Stage I", "Stage II", "Stage III", "Stage IV"),
+                              ordered = TRUE)
+  )
+
+
+
+# --- 6. Final Data Frame for OS Model ---
+# Select columns for the OS-based Cox model and remove any remaining NAs
+# (e.g., if grade_simplified or stage_simplified became NA for some rows).
+# PFI and PFI.time are not included in this specific OS model dataset but have been used for initial filtering.
+final_os_model_data <- analysis_data_cleaned %>%
+  select(
+    patient_id,
+    OS.time,
+    OS,
+    PFI, 
+    PFI.time,
+    age,
+    gender,
+    race,
+    stage = stage_simplified,
+    #grade = grade_simplified
+  ) %>%
+  na.omit() # Listwise deletion for rows with NAs in ANY of these selected model variables
+
+cat("\nDimensions of the final dataset for OS Cox model after all cleaning and NA removal:\n")
+print(dim(final_os_model_data))
+cat("\nSummary of the final dataset for OS Cox model:\n")
+summary(final_os_model_data)
+
+# Check if there's enough data to proceed for OS model
+if(nrow(final_os_model_data) < 20) {
+  warning("Very few complete cases remaining for OS model after NA removal. Cox model may not be stable. Please check data cleaning steps and NA patterns.")
+}
+if(nrow(final_os_model_data) > 0 && (length(unique(final_os_model_data$OS)) < 2 || sum(final_os_model_data$OS, na.rm = TRUE) < 5)) {
+    warning("Too few events or only one outcome type in the OS column for OS model. Cox model cannot be reliably fitted.")
+}
+# --- Export Cleaned Data ---
+# This exports 'final_os_model_data' used for the OS model.
+# To export the data after initial filtering but before selecting only OS model variables (i.e., keeping PFI columns etc.):
+# output_csv_filtered_intermediate <- "TCGA_LUAD_filtered_intermediate_data.csv"
+# readr::write_csv(analysis_data_cleaned, output_csv_filtered_intermediate)
+# cat(paste("\nData after user-specified filters (intermediate) exported to:", output_csv_filtered_intermediate, "\n"))
+
+output_csv_final_os_model <- "TCGA_LUAD_final_for_OS_model.csv"
+if(nrow(final_os_model_data) > 0) {
+  readr::write_csv(final_os_model_data, output_csv_final_os_model)
+  cat(paste("\nCleaned data specifically prepared for the OS model exported to:", output_csv_final_os_model, "\n"))
+} else {
+  cat(paste("\nNo data to export for OS model as final_os_model_data is empty.\n"))
+}
+```
+
