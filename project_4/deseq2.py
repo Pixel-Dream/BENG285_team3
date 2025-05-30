@@ -48,7 +48,7 @@ from pydeseq2.default_inference import DefaultInference
 from pydeseq2.ds import DeseqStats
 
 # Replace this with the path to directory where you would like results to be saved
-OUTPUT_PATH = "deseq2_test"
+OUTPUT_PATH = "deseq2_corrected_age_gender_race"
 os.makedirs(OUTPUT_PATH, exist_ok=True)
 
 counts_df = pd.DataFrame(adata.X.todense(), index=list(adata.obs["sample"]), columns=adata.var_names)
@@ -60,20 +60,30 @@ counts_df = counts_df.round(0).astype(int)
 metadata_df = pd.DataFrame(adata.obs)
 metadata_df.index = list(adata.obs["sample"])
 
-metadata_df["condition"] = metadata_df["OS"]
-metadata_df = metadata_df[["condition"]]
+# Convert gender to binary
+all_genders = metadata_df["gender"].unique()
+gender_to_int = {gender: i for i, gender in enumerate(all_genders)}
+metadata_df["gender"] = metadata_df["gender"].map(gender_to_int)
+
+# Convert race to int
+all_races = metadata_df["race"].unique()
+race_to_int = {race: i for i, race in enumerate(all_races)}
+metadata_df["race"] = metadata_df["race"].map(race_to_int)
+
+# metadata_df["condition"] = metadata_df["OS"]
+metadata_df = metadata_df[["OS", "age", "gender", "race"]]
 
 inference = DefaultInference(n_cpus=8)
 dds = DeseqDataSet(
     counts=counts_df,
     metadata=metadata_df,
-    design="~condition",
+    design="~OS+age+gender+race",
     refit_cooks=True,
     inference=inference,
 )
 
 dds.deseq2()
-ds = DeseqStats(dds, contrast=["condition", 0, 1], inference=inference)
+ds = DeseqStats(dds, contrast=["OS", 0, 1], inference=inference)
 ds.summary()
 
 #%%
