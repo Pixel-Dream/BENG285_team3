@@ -16,7 +16,7 @@ library(readr) # For readr::write_csv
 
 # --- 2. Load Metadata ---
 # Ensure "TCGA.LUAD.metadata.txt" is in your R working directory or provide the full path.
-metadata_file <- "TCGA.LUAD.metadata.txt"
+metadata_file <- "data/TCGA.LUAD.metadata.txt"
 if (!file.exists(metadata_file)) {
   stop(paste("Metadata file not found:", metadata_file,
              "\nPlease ensure it's in the working directory or provide the correct path."))

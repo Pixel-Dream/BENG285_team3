@@ -1,5 +1,5 @@
 library(EnhancedVolcano)
-data <- read_csv("./deseq2_results_full.csv")
+data <- read_csv("deseq2_corrected_age_gender_race/deseq2_results_full.csv")
 volcano_obj <- data.frame(
   "HGNC_Symbol" = data$...1,
   "logFC" = data$log2FoldChange,

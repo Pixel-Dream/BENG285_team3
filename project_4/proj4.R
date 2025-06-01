@@ -5,14 +5,14 @@ library(survminer)
 # !!! IMPORTANT: Replace this section with your actual data loading and preparation !!!
 set.seed(123) # for reproducibility
 
-df <- read_csv("Documents/UCSD_course/BENG285/TCGA_LUAD_final_for_OS_model.csv") %>%
+df <- read_csv("data/TCGA_LUAD_final_for_OS_model.csv") %>%
   column_to_rownames("patient_id")
 
-df_mut <- read_csv("Documents/UCSD_course/BENG285/KM_mutation_top10.csv") %>%
+df_mut <- read_csv("KM_mutation_top10.csv") %>%
   column_to_rownames("patient_id") %>%
   `colnames<-`(paste0(colnames(.),"_M"))
 
-df_de <- read_csv("Documents/UCSD_course/BENG285/KM_DEG_top10_expression.csv") %>%
+df_de <- read_csv("KM_DEG_top10_expression.csv") %>%
   group_by(patient_id) %>%
   summarise(across(all_of(colnames(.)[-1]), mean, .names = "{.col}")) %>%
   ungroup() %>%
