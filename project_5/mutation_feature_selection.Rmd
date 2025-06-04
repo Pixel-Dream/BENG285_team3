@@ -1,0 +1,158 @@
+---
+title: "mutation_preprocessing"
+author: "Jiaming Weng"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Dependencies
+```{r cars}
+library(tidyverse)
+```
+
+## Data
+```{r pressure, echo=FALSE}
+dsdn <- read.csv("../project_2/alphamissense/gene_results_with_am_significance.csv")
+permut <- read.csv("./permutation_res_2000_subset.csv")
+dndscv <- read.csv("./dndscv_significant_drivers.csv")
+
+dsdn_df <- dsdn %>% 
+  select(gene_name, significant, am_significant)
+
+permut_df <- permut %>%
+  mutate(gene_name = Hugo_Symbol) %>% 
+  mutate(perm_significant = ifelse(p_adj < 0.05, "True", "False")) %>% 
+  select(gene_name, perm_significant)
+
+cv_df <- dndscv %>%
+  mutate(cv_significant = ifelse(qglobal_cv < 0.05, "True", "False")) %>%
+  select(gene_name, cv_significant)
+
+merged_df <- permut_df %>%
+  full_join(dsdn_df,    by = "gene_name") %>%
+  full_join(cv_df,      by = "gene_name")
+
+## fill NA with False
+merged_df <- merged_df %>%
+  mutate(across(c(perm_significant, significant, am_significant, cv_significant), 
+                 ~ ifelse(is.na(.), "False", .)))
+  
+  
+# Count how many TRUE’s each gene has across those four columns:
+merged_df <- merged_df %>%
+  mutate(n_true = rowSums(across(c(perm_significant, significant, am_significant, cv_significant), 
+                                      ~ . == "True")))
+
+# Keep only genes with at least two TRUE’s, and pull the gene_name:
+genes_consensus <- merged_df %>%
+  filter(n_true >= 2) %>%
+  pull(gene_name)
+```
+
+```{r}
+MI_genes <- read.csv("./sig_mutations_driver_genes_MI.csv") %>%
+  select(gene) %>% 
+  rename(gene_name = gene)
+
+intogen <- read.csv("./IntOGen-DriverGenes_LUAD.tsv", sep = "\t")
+intogen <- intogen %>%
+  select(Symbol) %>%
+  rename(gene_name = Symbol)
+
+# Union all
+gene_final <- c(genes_consensus, MI_genes$gene_name, intogen$gene_name) %>%
+  unique()
+```
+
+# OR intersect between any 2
+```{r}
+i1 <- intersect(genes_consensus, MI_genes$gene_name)
+i2 <- intersect(genes_consensus, intogen$gene_name)
+i3 <- intersect(MI_genes$gene_name, intogen$gene_name)
+
+gene_final <- union(i1, union(i2, i3))
+```
+
+### feature
+```{r}
+mutation <- read.csv("../project_4/raw_mutations_PASS_only.csv.gz")
+```
+
+```{r}
+# 1. Define non‐silent classifications (modify as needed)
+nonsilent <- setdiff(unique(mutation$Variant_Classification), "Silent")
+
+# 2. Filter to genes in gene_final and non‐silent mutations, then tally per patient/gene
+tbl <- mutation %>%
+  filter(Hugo_Symbol %in% gene_final,
+         Variant_Classification %in% nonsilent) %>%
+  count(patient_id, Hugo_Symbol)
+
+# 3. Pivot to patient×gene matrix (fill missing with 0)
+mat_df <- tbl %>%
+  pivot_wider(names_from = Hugo_Symbol,
+              values_from = n,
+              values_fill = 0)
+
+# 4. Turn into a matrix with patient_id as row names
+mat <- mat_df %>%
+  column_to_rownames("patient_id") %>%
+  as.matrix()
+```
+
+```{r}
+# ─── 1. Define thresholds ────────────────────────────────────────────────────
+min_mutations <- 5    # drop any gene whose total mutation count < 5
+corr_cutoff   <- 0.90 # consider genes with pairwise correlation > 0.90 as “too collinear”
+
+# ─── 2. Filter genes with too-few mutations ──────────────────────────────────
+#    Keep only columns (genes) whose column‐sum ≥ min_mutations
+mat2 <- mat[, colSums(mat, na.rm = TRUE) >= min_mutations]
+
+# ─── 3. Remove near-zero-variance genes ─────────────────────────────────────
+#    (These are genes that are essentially constant across patients.)
+library(caret)
+nzv_idx <- nearZeroVar(mat2, saveMetrics = FALSE)
+if (length(nzv_idx) > 0) {
+  mat2 <- mat2[, -nzv_idx]
+}
+
+# ─── 4. Drop highly correlated (multicollinear) genes ────────────────────────
+#    Compute pairwise Pearson correlations and remove one gene from each pair > corr_cutoff.
+corr_matrix <- cor(mat2)
+highCorr_idx <- findCorrelation(corr_matrix, cutoff = corr_cutoff, names = FALSE)
+
+if (length(highCorr_idx) > 0) {
+  mat2 <- mat2[, -highCorr_idx]
+}
+
+# ─── 5. Save the filtered matrix as CSV ─────────────────────────────────────
+#    Rows are patients; columns are filtered genes.
+write.csv(mat2,
+          file = "./colinear_union_patient_gene_matrix.csv",
+          row.names = TRUE)
+
+# write.csv(mat2,
+#           file = "./intersect_union_patient_gene_matrix.csv",
+#           row.names = TRUE)
+
+```
+
+```{r}
+# ─── 1. Define thresholds ────────────────────────────────────────────────────
+min_mutations <- 5    # drop any gene whose total mutation count < 5
+corr_cutoff   <- 0.90 # consider genes with pairwise correlation > 0.90 as “too collinear”
+
+# ─── 2. Filter genes with too-few mutations ──────────────────────────────────
+#    Keep only columns (genes) whose column‐sum ≥ min_mutations
+mat2 <- mat[, colSums(mat, na.rm = TRUE) >= min_mutations]
+
+write.csv(mat2,
+          file = "./full_union_patient_gene_matrix.csv",
+          row.names = TRUE)
+```
+
