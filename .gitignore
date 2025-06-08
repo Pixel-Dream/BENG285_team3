@@ -31,4 +31,5 @@ project_4/deseq2_corrected_age_gender_race/
 
 project_5/mutation_data/
 project_5/clinical_with_3yr_label.csv
-project_5/*.h5ad
+project_5/data/
+project_5/results/
