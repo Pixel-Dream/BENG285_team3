@@ -35,6 +35,8 @@ python train_nn_cv.py --model_type continuous --param_grid_json param_grid.json 
 python train_nn_cv.py --model_type attention --param_grid_json param_grid.json --output_csv attention_nn_ablation_results.csv
 ```
 
+For XGBoost model training, cross-validation and hyperparam tuning, please refer to `xgboost.ipynb` file.
+
 For LLaMA-3.2-3B model, please firstly run the `llama3_data_cleaning.py` to preprocess the data. Then, please refer to `llama3_train.py` to train the model. We do not suggest running the `llama3_train.py` file because it takes too much resources to train the model.
 
 For the ablation tests on SVM model, please run the following command:
