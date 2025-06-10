@@ -54,11 +54,20 @@ def main(args):
     labels = adata.obs['survival_3yr_label'].values
 
     # 2. Define fixed hyperparameters for the model
+    # best_params with overfitting
     best_params = {
         'alpha': 0.001, 'l1_ratio': 0.5, 'learning_rate': 'optimal',
         'eta0': 0, 'warm_start': True, 'loss': 'hinge', 'penalty': 'elasticnet',
         'max_iter': 1000, 'tol': 1e-3, 'random_state': 42
     }
+    
+    # best_params without overfitting
+    # best_params = {
+    #     'alpha': 0.5, 'l1_ratio': 0.5, 'learning_rate': 'constant',
+    #     'eta0': 0.0001, 'warm_start': True, 'loss': 'hinge', 
+    #     'penalty': 'elasticnet', 'max_iter': 1000, 'early_stopping': True,
+    #     'random_state': 42
+    # }
 
     # 3. Define ablation study scenarios
     ablation_scenarios = [
@@ -154,7 +163,7 @@ if __name__ == '__main__':
     
     parser.add_argument('--anndata_path', type=str, default='data/combined_data.h5ad', help='Path to the .h5ad data file.')
     parser.add_argument('--test_size', type=float, default=0.2, help='Proportion of the dataset to use for the final hold-out test set.')
-    parser.add_argument('--output_csv', type=str, default='svm_ablation_results.csv', help='Path to save the output results CSV file.')
+    parser.add_argument('--output_csv', type=str, default='svm_ablation_results_overfitted.csv', help='Path to save the output results CSV file.')
 
     args = parser.parse_args()
     main(args) 

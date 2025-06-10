@@ -113,13 +113,15 @@ def k_fold_cross_validation(feature_matrix, labels, model_class, model_kwargs,
         X_rna_train, X_rna_val = X_rna[train_idx], X_rna[val_idx]
         y_train, y_val = labels[train_idx], labels[val_idx]
 
-        scaler_dna = StandardScaler().fit(X_dna_train)
-        X_dna_train = scaler_dna.transform(X_dna_train)
-        X_dna_val = scaler_dna.transform(X_dna_val)
+        if X_dna_train.shape[1] > 0:
+            scaler_dna = StandardScaler().fit(X_dna_train)
+            X_dna_train = scaler_dna.transform(X_dna_train)
+            X_dna_val = scaler_dna.transform(X_dna_val)
 
-        scaler_rna = StandardScaler().fit(X_rna_train)
-        X_rna_train = scaler_rna.transform(X_rna_train)
-        X_rna_val = scaler_rna.transform(X_rna_val)
+        if X_rna_train.shape[1] > 0:
+            scaler_rna = StandardScaler().fit(X_rna_train)
+            X_rna_train = scaler_rna.transform(X_rna_train)
+            X_rna_val = scaler_rna.transform(X_rna_val)
         
         model_kwargs['n_dna_features'] = X_dna_train.shape[1]
         model_kwargs['n_rna_features'] = X_rna_train.shape[1]

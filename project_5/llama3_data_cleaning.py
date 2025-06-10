@@ -3,7 +3,7 @@ import h5py
 import pandas as pd
 
 # Step 1: Load the sparse expression matrix
-with h5py.File("combined_data.h5ad", "r") as f:
+with h5py.File("data/combined_data.h5ad", "r") as f:
     data = f["X"]["data"][:]
     indices = f["X"]["indices"][:]
     indptr = f["X"]["indptr"][:]
