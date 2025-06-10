@@ -18,7 +18,7 @@ Please firstly go to the project_5 directory and run the following command:
 
 ```bash
 cd project_5
-# gdown --folder https://drive.google.com/drive/folders/1HhJ02YQFGrVWEo23duM-T_HBGiSMz-oL?usp=drive_link
+gdown --folder https://drive.google.com/drive/folders/18shpLHrWOG4VzCYHpq9j9wodZcyc5yHk?usp=sharing
 ```
 
 This will download the data to the `data` directory.
