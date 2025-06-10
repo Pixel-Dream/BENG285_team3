@@ -23,7 +23,7 @@ cd project_5
 
 This will download the data to the `data` directory.
 
-The data preprocessing code is in the `dev_codes/data_pp.ipynb` file. We've provided the processed dataset from previous gdown session so no need to rerun it. The data is from various previous projects.
+The mutation data is processed in the `mutation_feature_selection.Rmd` file. The further data preprocessing code is in the `dev_codes/data_pp.ipynb` file. We've provided the processed dataset from previous gdown session so no need to rerun it. The data is from various previous projects.
 
 For SVM model training, cross-validation and hyperparam tuning, please refer to `linearSVM_ElasticNet.ipynb` file.
 
@@ -36,3 +36,8 @@ python train_nn_cv.py --model_type attention --param_grid_json param_grid.json -
 ```
 
 For LLaMA-3.2-3B model, please firstly run the `llama3_data_cleaning.py` to preprocess the data. Then, please refer to `llama3_train.py` to train the model. We do not suggest running the `llama3_train.py` file because it takes too much resources to train the model.
+
+For the ablation tests on SVM model, please run the following command:
+```bash
+python train_svm.py
+```
